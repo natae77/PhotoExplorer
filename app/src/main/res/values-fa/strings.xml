@@ -9,7 +9,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     tools:ignore="ImpliedQuantity">
 
-    <string name="app_name">پرونده‌های متریال</string>
+    <string name="app_name">PhotoExplorer</string>
 
     <string name="close">بستن</string>
     <string name="copy">رونوشت</string>

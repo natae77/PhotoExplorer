@@ -3,6 +3,7 @@
 /.kotlin/
 /build/
 /captures/
+/gradle/gradle-daemon-jvm.properties
 /local.properties
 /signing.jks
 /signing.properties

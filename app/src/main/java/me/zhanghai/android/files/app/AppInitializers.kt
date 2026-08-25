@@ -43,8 +43,9 @@ val appInitializers = listOf(
 )
 
 private fun initializeCrashlytics() {
+    // PhotoExplorer: Firebase 제거 — 아무것도 하지 않는다.
 //#ifdef NONFREE
-    me.zhanghai.android.files.nonfree.CrashlyticsInitializer.initialize()
+//    me.zhanghai.android.files.nonfree.CrashlyticsInitializer.initialize()
 //#endif
 }
 
