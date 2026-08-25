@@ -3,6 +3,8 @@
 2026-08-25 작업 내용을 다음 사람(또는 다른 기계, 새 대화)이 이어받기 위한 문서.
 **새로 시작한다면 이 문서를 먼저 읽으면 된다.**
 
+- 최종 갱신: 2026-08-25 (브랜치를 `main`으로 바꾼 뒤)
+
 ## 1. 한 문장 요약
 
 Material Files를 fork해 **PhotoExplorer**로 분리했고, 사진·동영상을 정사각형 격자로 보는
@@ -17,6 +19,7 @@ Material Files를 fork해 **PhotoExplorer**로 분리했고, 사진·동영상�
 | 프로젝트 이름 | PhotoExplorer |
 | git 원격 `origin` | `https://github.com/natae77/PhotoExplorer.git` |
 | git 원격 `upstream` | `https://github.com/zhanghai/MaterialFiles.git` (원본 추적용) |
+| 브랜치 | **`main`** (`origin/main` 추적) |
 | 기준 커밋 | `fc12500` |
 | 앱 식별자 | `com.natae.photoexplorer` |
 | 코드 패키지(namespace) | `me.zhanghai.android.files` — **일부러 안 바꿨다** (아래 참고) |
@@ -31,9 +34,27 @@ Material Files를 fork해 **PhotoExplorer**로 분리했고, 사진·동영상�
 막아뒀지만(`"Please, don't spam."`), **Analytics에는 그런 검사가 없다.** 그대로 두면 우리 앱 사용
 데이터가 원저자의 Firebase 프로젝트로 흘러간다. 그래서 통째로 제거했다.
 
+### git 연결 — 정리 끝
+
+원격 `origin`은 접속 확인됐고, 로컬 브랜치는 **`main`** 이 `origin/main`을 추적한다.
+
+원래는 브랜치 이름이 `master`였고, 게다가 **`upstream/master`(원저자 저장소)를 추적하고 있었다.**
+그대로 `git push` 하면 내 저장소가 아니라 원저자 저장소로 밀어 올리려는 셈이라 방향이 틀렸다.
+2026-08-25에 `main`으로 이름을 바꾸고 추적 대상도 `origin/main`으로 고쳤다.
+
+```bash
+git branch -m master main
+git branch -u origin/main main
+```
+
+**아직 남은 것 — 사람이 직접 해야 한다.**
+GitHub 쪽 **기본 브랜치가 아직 `master`** 다. 원격에 `main`과 `master`가 같은 커밋으로 둘 다 있다.
+웹에서 **Settings → General → Default branch** 를 `main`으로 바꾸고, 그 뒤에 `master` 브랜치를
+지우면 된다(커밋이 같은 자리라 잃는 건 없다). 이 PC에는 `gh` CLI가 없어서 명령으로는 못 한다.
+
 ### 아직 커밋 안 됨
 
-작업 폴더에 **커밋되지 않은 변경 37개**가 있다. 커밋은 사용자가 판단하기로 했다.
+포크 분리 작업이 **아직 커밋되지 않은 채** 작업 폴더에 있다. 커밋은 사용자가 하기로 했다.
 
 | 변경 | 내용 |
 |---|---|
@@ -41,20 +62,27 @@ Material Files를 fork해 **PhotoExplorer**로 분리했고, 사진·동영상�
 | `app/src/main/java/.../app/AppInitializers.kt` | Crashlytics 호출 주석 처리 |
 | `app/src/main/java/.../nonfree/CrashlyticsInitializer.kt` | **삭제** |
 | `app/src/main/res/values*/strings.xml` (32개) | 앱 이름 |
+| `.gitignore` | `/gradle/gradle-daemon-jvm.properties` 한 줄 추가 (아래 참고) |
 | `PersonalDev/` | 문서 전체 (git에 아직 안 올라감) |
 
 빌드는 확인했다 — `BUILD SUCCESSFUL`, APK 식별자 `com.natae.photoexplorer`.
 
-### 폴더 이름
+한 번 `c8d9c27`로 커밋했다가 되돌렸다(`git reset --soft`). `gradle-daemon-jvm.properties`가
+딸려 들어가 있어서다. push 전이라 원격에는 흔적이 없다.
 
-작업 폴더를 `D:\Work\MaterialFiles` → `D:\Work\PhotoExplorer` 로 바꾸기로 했다.
-**아직 안 바꿨을 수도 있다.** 안 바꿨으면:
+### `gradle/gradle-daemon-jvm.properties` 는 무시한다
 
-```bash
-mv /d/Work/MaterialFiles /d/Work/PhotoExplorer
-```
+`.gitignore`에 넣었다. 이유:
 
-Android Studio를 닫고 해야 한다. git은 폴더 이름이 바뀌어도 그대로 동작한다.
+- **자동으로 생기는 파일이 아니다.** `./gradlew updateDaemonJvm`을 실행해야 만들어진다
+  (Android Studio에서 Gradle 데몬 JVM 설정을 건드리면 대신 실행해준다). 평범한 빌드로는 안 생긴다.
+- 이 파일이 있으면 **툴체인을 JDK 25로 고정**하고, 없으면 Gradle이 인터넷에서 받아온다.
+  지금 빌드가 성공하는 환경은 Android Studio 내장 JBR이다. 파일을 빼두면 그 상태가 유지된다.
+
+### 폴더 이름 — 바꿈
+
+작업 폴더는 **`D:\Work\PhotoExplorer`** 다. `D:\Work\MaterialFiles`에서 이름을 바꿨다.
+다른 기계에서 새로 받는다면 아무 폴더나 상관없다.
 
 ## 3. 무엇을 만들기로 했나
 

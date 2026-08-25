@@ -39,7 +39,9 @@
 
 ### 0.1 브랜치
 
-`master`에서 작업 브랜치를 딴다. upstream(`zhanghai/MaterialFiles`)과 충돌 가능성이 있는
+기본 브랜치는 **`main`** 이다(2026-08-25에 `master`에서 이름을 바꿨다. [10번 §2](10-handover.md) 참고).
+
+`main`에서 작업 브랜치를 딴다. upstream(`zhanghai/MaterialFiles`)과 충돌 가능성이 있는
 파일이 많으므로(특히 `FileListFragment.kt`) 브랜치를 분리한다.
 
 ### 0.2 앱 식별자 — 이미 해결됨
