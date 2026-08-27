@@ -5,6 +5,7 @@
 
 package me.zhanghai.android.files.filelist
 
+import android.content.res.ColorStateList
 import android.text.TextUtils
 import android.text.format.DateFormat
 import android.view.View
@@ -23,6 +24,7 @@ import me.zhanghai.android.fastscroll.PopupTextProvider
 import me.zhanghai.android.files.R
 import me.zhanghai.android.files.coil.AppIconPackageName
 import me.zhanghai.android.files.compat.foregroundCompat
+import me.zhanghai.android.files.compat.getColorCompat
 import me.zhanghai.android.files.compat.getDrawableCompat
 import me.zhanghai.android.files.compat.isSingleLineCompat
 import me.zhanghai.android.files.databinding.FileItemGridBinding
@@ -44,9 +46,10 @@ import me.zhanghai.android.files.ui.CheckableItemBackground
 import me.zhanghai.android.files.util.isMaterial3Theme
 import me.zhanghai.android.files.util.layoutInflater
 import me.zhanghai.android.files.util.valueCompat
+import java.text.SimpleDateFormat
+import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
-import java.text.SimpleDateFormat
 import java.time.ZoneId
 import java.util.Date
 import java.util.Locale
@@ -323,6 +326,23 @@ class FileListAdapter(
         val date = Date(item.epochMillis)
         holder.yearText.text = formatDate(date, "y")
         holder.dateText.text = formatDate(date, "MMMd")
+        // Weekend colouring on the day line only, see spec 4.3 (D23). Same time zone as the one
+        // that decided which day this tile belongs to.
+        val dayOfWeek = Instant.ofEpochMilli(item.epochMillis)
+            .atZone(ZoneId.systemDefault())
+            .dayOfWeek
+        when (dayOfWeek) {
+            DayOfWeek.SATURDAY ->
+                holder.dateText.setTextColor(
+                    holder.dateText.context.getColorCompat(R.color.media_date_saturday)
+                )
+            DayOfWeek.SUNDAY ->
+                holder.dateText.setTextColor(
+                    holder.dateText.context.getColorCompat(R.color.media_date_sunday)
+                )
+            // Must be put back: this holder may have been a weekend tile a moment ago.
+            else -> holder.dateText.setTextColor(holder.defaultDateTextColors)
+        }
         // Read as one label instead of two, and never announced as actionable. See spec 4.3.
         holder.itemView.contentDescription = formatDate(date, "yMMMd")
         // No click listeners are attached at all, so a date tile cannot be tapped or long pressed.
@@ -660,6 +680,16 @@ class FileListAdapter(
     ) : RecyclerView.ViewHolder(binding.root) {
         val yearText: TextView = binding.yearText
         val dateText: TextView = binding.dateText
+
+        /**
+         * The colour the theme gave [dateText], captured before anything recolours it.
+         *
+         * View holders are recycled, so a Saturday tile that was painted blue comes back as some
+         * Wednesday and has to be put back. A hardcoded constant would not follow the light/dark
+         * theme, and `currentTextColor` would only keep the colour for the current state, so the
+         * whole [ColorStateList] is kept.
+         */
+        val defaultDateTextColors: ColorStateList = dateText.textColors
     }
 
     interface Listener {

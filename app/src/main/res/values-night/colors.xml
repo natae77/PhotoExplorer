@@ -31,4 +31,8 @@
     <color name="file_icon_red">#F28B82</color>
     <color name="file_icon_deep_red">#E8877F</color>
     <color name="file_icon_yellow">#F8CF5C</color>
+
+    <!-- Lighter and less saturated so they stay readable on a dark surface. -->
+    <color name="media_date_saturday">#8AB4F8</color>
+    <color name="media_date_sunday">#F28B82</color>
 </resources>

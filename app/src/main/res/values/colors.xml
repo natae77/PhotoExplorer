@@ -46,4 +46,12 @@
     <color name="file_icon_red">#EA4335</color>
     <color name="file_icon_deep_red">#DB4437</color>
     <color name="file_icon_yellow">#F4B400</color>
+
+    <!--
+      ~ Media view mode date tiles, see PersonalDev/Doc/08-media-view-mode-spec.md 4.3 (D23).
+      ~ Decoration only: the tile already spells the date out, so nothing is lost when the colours
+      ~ cannot be told apart.
+      -->
+    <color name="media_date_saturday">#4285F4</color>
+    <color name="media_date_sunday">#EA4335</color>
 </resources>

@@ -36,6 +36,7 @@
 | 5 | **최신 사진부터 보기** | 폴더를 열면 맨 아래(최신)에서 시작 | ✅ 완료 | |
 | 6 | **폴더마다 보기 모드 기억하기** | 사진 폴더는 미디어, 문서 폴더는 목록 | ✅ 완료 | |
 | 7 | 검증 · 실제 폰에서 측정 | — | 🟡 에뮬레이터만 | 실기기(Fold 7) 측정 남음 |
+| 8 | **날짜 타일 요일 색** | 토요일 파랑 · 일요일 빨강 | ✅ 완료 | 기획서 6차 개정(D23) |
 
 > **2026-08-27 구현 완료.** 에뮬레이터(Pixel 8, API 36) 검증까지 끝냈다. 구현하면서 계획서에
 > 없던 함정이 다섯 개 더 나왔다 — [미결 항목 §E](media-view-mode-open-items.md)에 적어 뒀다.
@@ -829,6 +830,69 @@ fun putValue(value: FileViewType) {
 - **이미지** — JPEG(EXIF 있음/없음), PNG, HEIC
 - **다른 동영상 컨테이너** — mkv, webm, 3gp → `Mp4CreationTime` 파싱 실패 시
   `MediaMetadataRetriever` 폴백이 도는지, 그 비용이 얼마인지
+
+---
+
+## 8단계. 날짜 타일 요일 색
+
+기획서 **6차 개정(D23)** 으로 들어온 요구다. 5차까지 "선택 사항(없어도 됨)"이던 것이
+정식 요구가 됐다.
+
+> **왜 4단계 본문을 안 고치고 단계를 새로 붙였나** — §1의 원칙 그대로다.
+> 4단계는 이미 ✅로 끝나 있어서, 본문을 고쳐 놓으면 다음에 읽는 사람이
+> "4단계는 했지" 하고 넘어가 이 변경을 통째로 놓친다.
+
+### 8.1 색상 리소스
+
+**파일**: `res/values/colors.xml`, `res/values-night/colors.xml` (필요하면 신설)
+
+```
+media_date_saturday   토요일 파랑
+media_date_sunday     일요일 빨강
+```
+
+라이트/다크 값을 **따로** 둔다. 같은 값을 쓰면 어두운 배경에서 채도가 죽어 탁해진다.
+다크 쪽은 더 밝고 옅게 간다.
+
+### 8.2 바인딩
+
+**파일**: [`filelist/FileListAdapter.kt`](../../app/src/main/java/me/zhanghai/android/files/filelist/FileListAdapter.kt) — `bindDateViewHolder()`
+
+- **월·일 줄(`dateText`)에만** 색을 준다. 연도 줄(`yearText`)은 그대로 흐린 보조색이다.
+- 요일은 타일이 들고 있는 `epochMillis`를 **기기 시간대**로 해석해 구한다.
+  날짜 구간을 정할 때 쓴 것과 같은 시간대여야 한다(§4.2).
+
+```kotlin
+val dayOfWeek = Instant.ofEpochMilli(item.epochMillis)
+    .atZone(ZoneId.systemDefault())
+    .dayOfWeek
+```
+
+#### ⚠️ 평일에는 **기본색으로 되돌려야 한다**
+
+뷰홀더는 재사용된다. 토요일 타일에 파랑을 칠한 뷰홀더가 그대로 수요일 타일에 재활용되면
+**수요일이 파랗게 나온다.** 색을 칠하는 코드만 넣고 되돌리는 코드를 빼먹기 딱 좋은 자리다.
+
+기본색을 상수로 적어 두면 테마(라이트/다크)를 따라가지 못하므로,
+**뷰홀더를 만들 때 원래 색을 기억해 뒀다가** 평일에 그 값으로 되돌린다.
+
+```kotlin
+class DateViewHolder(binding: ...) : RecyclerView.ViewHolder(binding.root) {
+    ...
+    val defaultDateTextColors: ColorStateList = dateText.textColors   // 만들 때 한 번
+}
+```
+
+`currentTextColor`(Int)가 아니라 `textColors`(`ColorStateList`)를 기억한다. 전자는
+현재 상태의 색 하나뿐이라 되돌릴 때 상태별 색을 잃는다.
+
+### 8단계 검증
+
+- 토요일 타일의 월·일이 **파랑**, 일요일이 **빨강**, 나머지는 기본색
+- **연도 줄은 색이 안 변한다**
+- **스크롤을 위아래로 여러 번 해도 평일 타일이 물들지 않는다** (재사용 함정)
+- 다크 테마로 바꿔도 두 색이 읽힌다
+- 기기 시간대를 바꾸면 요일 판정이 따라 바뀐다(날짜 구간과 같은 기준)
 
 ---
 
