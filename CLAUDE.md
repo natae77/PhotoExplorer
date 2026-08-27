@@ -1,0 +1,19 @@
+# PhotoExplorer — 프로젝트 지침
+
+`zhanghai/MaterialFiles` fork. 개발 기록과 기획·계획은 [`PersonalDev/Doc/`](PersonalDev/Doc/README.md)에 있고,
+새로 시작한다면 [09번 구현 계획](PersonalDev/Doc/09-media-view-mode-plan.md)과
+[미결 항목](PersonalDev/Doc/media-view-mode-open-items.md)을 보면 된다.
+
+## git 커밋은 **절대** 하지 않는다
+
+**커밋은 사용자만 한다.** Claude는 어떤 상황에서도 `git commit`을 실행하지 않는다.
+
+- 작업이 끝났어도 **커밋하지 않는다.** "커밋할까요?"라고 묻지도 않는다 — 물어보는 것 자체가 불필요하다.
+- 사용자가 그 자리에서 **명시적으로 "커밋해"라고 지시할 때만** 예외다. 과거에 한 번 허락했다고 다음에도 되는 것이 아니다.
+- `git add`로 스테이징해 두는 것도 하지 않는다. 무엇을 커밋할지는 사용자가 정한다.
+- 브랜치 만들기, `git status`/`git diff`로 확인하기 같은 **읽기·비파괴 작업은 해도 된다.**
+- 작업을 마치면 **무엇이 바뀌었는지만 보고**하고 워킹트리에 그대로 둔다.
+- `git push`, `git reset --hard`, `git rebase` 등 이력을 바꾸거나 원격에 올리는 것도 같은 규칙이다.
+
+> 이 규칙을 전역 지침(`~/.claude/CLAUDE.md`)에도 적어 뒀지만, 그 파일은 **기계별 로컬**이라
+> 다른 기계에는 없다. 그래서 git으로 추적되는 이 파일에도 둔다.

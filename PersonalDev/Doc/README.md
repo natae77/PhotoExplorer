@@ -3,7 +3,8 @@
 `zhanghai/MaterialFiles`를 fork한 **PhotoExplorer**(`natae77/PhotoExplorer`)의 개발 기록.
 Windows 11에서 실제로 겪고 검증한 내용만 정리했다.
 
-> **처음 보는 사람은 [10번 인계 문서](10-handover.md)부터 읽으면 된다.**
+> **처음 보는 사람은 [09번 구현 계획](09-media-view-mode-plan.md)과
+> [미결 항목](media-view-mode-open-items.md)부터 읽으면 된다.**
 
 ## 환경 요약
 
@@ -27,9 +28,9 @@ Windows 11에서 실제로 겪고 검증한 내용만 정리했다.
 | [05-test-data-pipeline.md](05-test-data-pipeline.md) | 폰 → PC → 에뮬레이터 테스트 데이터 이관 |
 | [06-video-date-metadata.md](06-video-date-metadata.md) | 파일 속성의 "촬영 시각"이 어디서 오는가 (코드 분석) |
 | [07-windows-gitbash-adb-pitfalls.md](07-windows-gitbash-adb-pitfalls.md) | Windows/Git Bash에서 adb 스크립팅 함정 |
-| [08-photo-view-mode-spec.md](08-photo-view-mode-spec.md) | 미디어 보기 모드 추가 기획서 (목록/바둑판/미디어) |
-| [09-media-view-mode-plan.md](09-media-view-mode-plan.md) | 미디어 보기 모드 구현 계획 (1~6단계) |
-| [10-handover.md](10-handover.md) | **인계 문서 — 여기서부터 이어서 하면 된다** |
+| [08-media-view-mode-spec.md](08-media-view-mode-spec.md) | 미디어 보기 모드 추가 기획서 (목록/바둑판/미디어, 날짜 타일) |
+| [09-media-view-mode-plan.md](09-media-view-mode-plan.md) | 미디어 보기 모드 구현 계획 (0~7단계) |
+| [media-view-mode-open-items.md](media-view-mode-open-items.md) | 09번 계획서의 미결 항목 — 누락·미결정·문서 모순 (착수 전 확인) |
 
 ## 핵심 요약 (급할 때 여기만)
 
