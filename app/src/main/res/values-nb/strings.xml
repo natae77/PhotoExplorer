@@ -292,7 +292,6 @@
     <string name="file_list_action_sort_by_last_modified">Sist endret</string>
     <string name="file_list_action_sort_order_ascending">Stigende</string>
     <string name="file_list_action_sort_directories_first">Mapper først</string>
-    <string name="file_list_action_view_sort_path_specific">Kun for denne mappen</string>
     <string name="file_list_action_new_task">Nytt vindu</string>
     <string name="file_list_action_navigate_up">Gå opp</string>
     <string name="file_list_action_navigate_to">Gå til</string>

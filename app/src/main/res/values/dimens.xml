@@ -38,6 +38,17 @@
     <dimen name="small_icon_size">18dp</dimen>
     <dimen name="icon_size">24dp</dimen>
     <dimen name="large_icon_size">40dp</dimen>
+
+    <!-- Media view mode, see PersonalDev/Doc/08-media-view-mode-spec.md 4. -->
+    <dimen name="media_item_width">112dp</dimen>
+    <!-- 24dp icon + 4dp outer + 20dp inner = 48dp touch target pinned to the corner. -->
+    <dimen name="media_item_menu_padding_outer">4dp</dimen>
+    <dimen name="media_item_menu_padding_inner">20dp</dimen>
+    <dimen name="media_item_scrim_size">48dp</dimen>
+    <dimen name="media_item_video_badge_size">20dp</dimen>
+    <dimen name="media_item_video_badge_margin">4dp</dimen>
+    <dimen name="media_item_name_padding">4dp</dimen>
+    <dimen name="media_item_date_padding">4dp</dimen>
     <dimen name="touch_target_size">48dp</dimen>
     <dimen name="touch_target_icon_padding">12dp</dimen>
     <dimen name="touch_target_large_icon_padding">4dp</dimen>

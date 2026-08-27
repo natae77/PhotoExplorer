@@ -292,7 +292,6 @@
     <string name="file_list_action_sort_by_last_modified">Последна промяна</string>
     <string name="file_list_action_sort_order_ascending">Възходящ</string>
     <string name="file_list_action_sort_directories_first">Първо папките</string>
-    <string name="file_list_action_view_sort_path_specific">Само за тази папка</string>
     <string name="file_list_action_new_task">Нов прозорец</string>
     <string name="file_list_action_navigate_up">Нагоре</string>
     <string name="file_list_action_navigate_to">Отваряне на</string>

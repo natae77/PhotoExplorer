@@ -7,5 +7,9 @@ package me.zhanghai.android.files.filelist
 
 enum class FileViewType {
     LIST,
-    GRID
+    GRID,
+
+    // Must stay last: this is persisted to SharedPreferences by ordinal, so inserting a value in
+    // the middle would silently change what existing users have stored. See spec 9.
+    MEDIA
 }

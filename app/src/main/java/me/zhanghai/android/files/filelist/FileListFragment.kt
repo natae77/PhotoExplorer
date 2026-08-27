@@ -70,6 +70,7 @@ import me.zhanghai.android.files.file.extension
 import me.zhanghai.android.files.file.fileProviderUri
 import me.zhanghai.android.files.file.isApk
 import me.zhanghai.android.files.file.isImage
+import me.zhanghai.android.files.file.isVideo
 import me.zhanghai.android.files.filejob.FileJobService
 import me.zhanghai.android.files.filelist.FileSortOptions.By
 import me.zhanghai.android.files.filelist.FileSortOptions.Order
@@ -172,6 +173,14 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, FileListAdapter.
     private lateinit var navigationFragment: NavigationFragment
 
     private lateinit var menuBinding: MenuBinding
+
+    // Media mode starts at the newest item, but only once per folder. See plan step 5.
+    private var hasScrolledToLatest = false
+
+    // The folder the list currently on screen was loaded for. fileListLiveData is a switch map on
+    // the current path and keeps the previous folder's value until the new one arrives, so its
+    // state alone does not say whether the adapter holds this folder's files.
+    private var loadedPath: Path? = null
 
     private lateinit var overlayActionMode: ToolbarActionMode
 
@@ -357,9 +366,6 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, FileListAdapter.
             }
         }
         viewModel.sortOptionsLiveData.observe(viewLifecycleOwner) { onSortOptionsChanged(it) }
-        viewModel.viewSortPathSpecificLiveData.observe(viewLifecycleOwner) {
-            onViewSortPathSpecificChanged(it)
-        }
         viewModel.pickOptionsLiveData.observe(viewLifecycleOwner) { onPickOptionsChanged(it) }
         viewModel.selectedFilesLiveData.observe(viewLifecycleOwner) { onSelectedFilesChanged(it) }
         viewModel.pasteStateLiveData.observe(viewLifecycleOwner) { onPasteStateChanged(it) }
@@ -462,6 +468,10 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, FileListAdapter.
                 viewModel.viewType = FileViewType.GRID
                 true
             }
+            R.id.action_view_media -> {
+                viewModel.viewType = FileViewType.MEDIA
+                true
+            }
             R.id.action_sort_by_name -> {
                 viewModel.setSortBy(By.NAME)
                 true
@@ -478,6 +488,10 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, FileListAdapter.
                 viewModel.setSortBy(By.LAST_MODIFIED)
                 true
             }
+            R.id.action_sort_by_media_created -> {
+                viewModel.setSortBy(By.MEDIA_CREATED)
+                true
+            }
             R.id.action_sort_order_ascending -> {
                 viewModel.setSortOrder(
                     if (!menuBinding.sortOrderAscendingItem.isChecked) {
@@ -490,10 +504,6 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, FileListAdapter.
             }
             R.id.action_sort_directories_first -> {
                 viewModel.setSortDirectoriesFirst(!menuBinding.sortDirectoriesFirstItem.isChecked)
-                true
-            }
-            R.id.action_view_sort_path_specific -> {
-                viewModel.isViewSortPathSpecific = !menuBinding.viewSortPathSpecificItem.isChecked
                 true
             }
             R.id.action_new_task -> {
@@ -578,6 +588,8 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, FileListAdapter.
     }
 
     private fun onCurrentPathChanged(path: Path) {
+        hasScrolledToLatest = false
+        loadedPath = null
         updateOverlayToolbar()
         updateBottomToolbar()
     }
@@ -608,16 +620,59 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, FileListAdapter.
                 binding.errorText.text = error
             }
         }
-        binding.emptyView.fadeToVisibilityUnsafe(stateful is Success && !hasFiles)
         if (files != null) {
             updateAdapterFileList()
         } else {
             // This resets animation as well.
             adapter.clear()
+            updateEmptyView()
         }
         if (stateful is Success) {
-            viewModel.pendingState?.let { layoutManager.onRestoreInstanceState(it) }
+            loadedPath = viewModel.currentPath
+            // pendingState is a *consuming* getter: TrailData.pendingState does
+            // states.set(currentIndex, null), which returns the old value and clears the slot. It
+            // must be read exactly once, or the restore below gets null. See plan step 5.
+            val pendingState = viewModel.pendingState
+            when {
+                pendingState != null -> {
+                    layoutManager.onRestoreInstanceState(pendingState)
+                    hasScrolledToLatest = true
+                }
+                else -> maybeScrollToLatest()
+            }
         }
+    }
+
+    /**
+     * Media mode opens at the newest item, which is the bottom of the list while ascending
+     * (spec 6).
+     *
+     * Runs at most once per folder. pendingState is consumed on the first read, so without the
+     * flag every later call - a PathObserver refresh, for instance - would look like a fresh entry
+     * and yank the list back to the bottom while the user is reading it.
+     *
+     * The flag is only set when a scroll actually happened. This is also called from
+     * onViewTypeChanged(), which can run before the file list for the new folder has loaded, and
+     * claiming the scroll there would suppress the real one.
+     */
+    private fun maybeScrollToLatest() {
+        // LiveData accessors rather than viewModel.viewType / viewModel.sortOptions: those go
+        // through valueCompat, which throws while a value has not arrived yet, and this runs from
+        // the view type observer during startup.
+        if (hasScrolledToLatest
+            || loadedPath != viewModel.currentPath
+            || viewModel.fileListLiveData.value !is Success
+            || viewModel.viewTypeLiveData.value != FileViewType.MEDIA
+            || viewModel.sortOptionsLiveData.value?.order != Order.ASCENDING) {
+            return
+        }
+        // ListDiffer is synchronous, so the item count is already up to date here.
+        val itemCount = adapter.itemCount
+        if (itemCount == 0) {
+            return
+        }
+        layoutManager.scrollToPosition(itemCount - 1)
+        hasScrolledToLatest = true
     }
 
     private fun getSubtitle(files: List<FileItem>): String {
@@ -650,30 +705,41 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, FileListAdapter.
     private fun onViewTypeChanged(viewType: FileViewType) {
         updateSpanCount()
         adapter.viewType = viewType
+        // The set of displayed files depends on the view type in media mode.
+        updateAdapterFileList()
         updateViewSortMenuItems()
+        // Switching into media mode should land on the newest item too, not just opening a folder
+        // that is already in media mode.
+        hasScrolledToLatest = false
+        maybeScrollToLatest()
     }
 
     private fun updateSpanCount() {
         layoutManager.spanCount = when (viewModel.viewType) {
             FileViewType.LIST -> 1
-            FileViewType.GRID -> {
-                var widthDp = resources.configuration.screenWidthDp
-                val persistentDrawerLayout = binding.persistentDrawerLayout
-                if (persistentDrawerLayout != null &&
-                    persistentDrawerLayout.isDrawerOpen(GravityCompat.START)) {
-                    widthDp -= getDimensionDp(R.dimen.navigation_max_width).roundToInt()
-                }
-                (widthDp / 180).coerceAtLeast(2)
-            }
+            FileViewType.GRID -> (availableWidthDp / 180).coerceAtLeast(2)
+            // No minimum column count, but GridLayoutManager throws on a span count below 1.
+            // See spec 4.
+            FileViewType.MEDIA -> (availableWidthDp / 112).coerceAtLeast(1)
         }
     }
 
+    private val availableWidthDp: Int
+        get() {
+            var widthDp = resources.configuration.screenWidthDp
+            val persistentDrawerLayout = binding.persistentDrawerLayout
+            if (persistentDrawerLayout != null &&
+                persistentDrawerLayout.isDrawerOpen(GravityCompat.START)) {
+                widthDp -= getDimensionDp(R.dimen.navigation_max_width).roundToInt()
+            }
+            return widthDp
+        }
+
     private fun onSortOptionsChanged(sortOptions: FileSortOptions) {
         adapter.sortOptions = sortOptions
-        updateViewSortMenuItems()
-    }
-
-    private fun onViewSortPathSpecificChanged(pathSpecific: Boolean) {
+        // The view type observer may have run before this one, in which case its rebuild was a
+        // no-op and the list still has to be built.
+        updateAdapterFileList()
         updateViewSortMenuItems()
     }
 
@@ -690,19 +756,30 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, FileListAdapter.
         val checkedViewTypeItem = when (viewType) {
             FileViewType.LIST -> menuBinding.viewListItem
             FileViewType.GRID -> menuBinding.viewGridItem
+            FileViewType.MEDIA -> menuBinding.viewMediaItem
         }
         checkedViewTypeItem.isChecked = true
         val sortOptions = viewModel.sortOptions
-        val checkedSortByItem = when (sortOptions.by) {
+        // Media mode displays the pinned criterion, not the stored one. See FileListAdapter
+        // .effectiveSortOptions.
+        val sortBy = if (viewType == FileViewType.MEDIA) By.MEDIA_CREATED else sortOptions.by
+        val checkedSortByItem = when (sortBy) {
             By.NAME -> menuBinding.sortByNameItem
             By.TYPE -> menuBinding.sortByTypeItem
             By.SIZE -> menuBinding.sortBySizeItem
             By.LAST_MODIFIED -> menuBinding.sortByLastModifiedItem
+            By.MEDIA_CREATED -> menuBinding.sortByMediaCreatedItem
         }
         checkedSortByItem.isChecked = true
+        // Media mode pins the sort criterion to the media created time and greys out the rest,
+        // ascending/descending and directories first stay available. See spec 8.
+        val isMedia = viewType == FileViewType.MEDIA
+        menuBinding.sortByNameItem.isEnabled = !isMedia
+        menuBinding.sortByTypeItem.isEnabled = !isMedia
+        menuBinding.sortBySizeItem.isEnabled = !isMedia
+        menuBinding.sortByLastModifiedItem.isEnabled = !isMedia
         menuBinding.sortOrderAscendingItem.isChecked = sortOptions.order == Order.ASCENDING
         menuBinding.sortDirectoriesFirstItem.isChecked = sortOptions.isDirectoriesFirst
-        menuBinding.viewSortPathSpecificItem.isChecked = viewModel.isViewSortPathSpecific
     }
 
     private fun navigateUp() {
@@ -732,11 +809,39 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, FileListAdapter.
     }
 
     private fun updateAdapterFileList() {
-        var files = viewModel.fileListStateful.value ?: return
+        // May be called before the first load has produced anything, e.g. from the view type
+        // observer during startup.
+        var files = viewModel.fileListLiveData.value?.value ?: return
         if (!Settings.FILE_LIST_SHOW_HIDDEN_FILES.valueCompat) {
             files = files.filterNot { it.isHidden }
         }
+        if (viewModel.viewType == FileViewType.MEDIA) {
+            // Media mode only shows images, videos and directories. The toolbar subtitle keeps
+            // counting everything, because getSubtitle() is fed the unfiltered list. See spec 3.
+            files = files.filter {
+                it.attributes.isDirectory || it.mimeType.isImage || it.mimeType.isVideo
+            }
+        }
         adapter.replaceListAndIsSearching(files, viewModel.searchState.isSearching)
+        updateEmptyView()
+    }
+
+    /**
+     * The stateful list is unfiltered, so a folder of documents opened in media mode has files but
+     * nothing to show. Without this the empty view would stay hidden and the screen would just be
+     * blank. See spec 10.
+     */
+    private fun updateEmptyView() {
+        val stateful = viewModel.fileListLiveData.value ?: return
+        val isEmpty = adapter.itemCount == 0
+        binding.emptyView.fadeToVisibilityUnsafe(stateful is Success && isEmpty)
+        binding.emptyView.setText(
+            if (viewModel.viewType == FileViewType.MEDIA) {
+                R.string.file_list_empty_media
+            } else {
+                R.string.file_list_empty
+            }
+        )
     }
 
     private fun updateShowHiddenFilesMenuItem() {
@@ -1292,7 +1397,10 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, FileListAdapter.
         var paths = mutableListOf<Path>()
         // We need the ordered list from our adapter instead of the list from FileListLiveData.
         for (index in 0..<adapter.itemCount) {
-            val file = adapter.getItem(index)
+            // Date tiles are not files. Missing this crashes when opening a photo, and this loop
+            // lives outside the adapter so it is easy to overlook. See plan 4.1.
+            val item = adapter.getItem(index) as? FileListItem.File ?: continue
+            val file = item.file
             val filePath = file.path
             if (file.mimeType.isImage || filePath == path) {
                 paths.add(filePath)
@@ -1667,7 +1775,7 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, FileListAdapter.
         val contentLayout: ViewGroup,
         val progress: ProgressBar,
         val errorText: TextView,
-        val emptyView: View,
+        val emptyView: TextView,
         val swipeRefreshLayout: SwipeRefreshLayout,
         val recyclerView: RecyclerView,
         val bottomBarLayout: ViewGroup,
@@ -1708,13 +1816,14 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, FileListAdapter.
         val viewSortItem: MenuItem,
         val viewListItem: MenuItem,
         val viewGridItem: MenuItem,
+        val viewMediaItem: MenuItem,
         val sortByNameItem: MenuItem,
         val sortByTypeItem: MenuItem,
         val sortBySizeItem: MenuItem,
         val sortByLastModifiedItem: MenuItem,
+        val sortByMediaCreatedItem: MenuItem,
         val sortOrderAscendingItem: MenuItem,
         val sortDirectoriesFirstItem: MenuItem,
-        val viewSortPathSpecificItem: MenuItem,
         val selectAllItem: MenuItem,
         val showHiddenFilesItem: MenuItem
     ) {
@@ -1724,13 +1833,14 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, FileListAdapter.
                 return MenuBinding(
                     menu, menu.findItem(R.id.action_search), menu.findItem(R.id.action_view_sort),
                     menu.findItem(R.id.action_view_list), menu.findItem(R.id.action_view_grid),
+                    menu.findItem(R.id.action_view_media),
                     menu.findItem(R.id.action_sort_by_name),
                     menu.findItem(R.id.action_sort_by_type),
                     menu.findItem(R.id.action_sort_by_size),
                     menu.findItem(R.id.action_sort_by_last_modified),
+                    menu.findItem(R.id.action_sort_by_media_created),
                     menu.findItem(R.id.action_sort_order_ascending),
                     menu.findItem(R.id.action_sort_directories_first),
-                    menu.findItem(R.id.action_view_sort_path_specific),
                     menu.findItem(R.id.action_select_all),
                     menu.findItem(R.id.action_show_hidden_files)
                 )

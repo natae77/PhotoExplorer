@@ -31,6 +31,11 @@ data class FileSortOptions(
             By.LAST_MODIFIED ->
                 comparator = compareBy<FileItem> { it.attributes.lastModifiedTime() }
                     .then(comparator)
+            By.MEDIA_CREATED ->
+                // Files without a media created time fall back to their last modified time, so
+                // that non-media files still sort sensibly instead of clumping together.
+                comparator = compareBy<FileItem> { it.mediaCreatedTimeMillisOrLastModified }
+                    .then(comparator)
         }
         when (order) {
             Order.ASCENDING -> {}
@@ -53,7 +58,11 @@ data class FileSortOptions(
         NAME,
         TYPE,
         SIZE,
-        LAST_MODIFIED
+        LAST_MODIFIED,
+
+        // Must stay last: FileSortOptions is persisted via @Parcelize, so reordering would change
+        // the meaning of already stored values. See spec 9.
+        MEDIA_CREATED
     }
 
     enum class Order {

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+  ~ Copyright (c) 2026 PhotoExplorer
+  ~ All Rights Reserved.
+  -->
+
+<!--
+  ~ Top scrim so the always-visible menu button stays readable on a bright photo (spec 4.1).
+  ~ Full tile width and a smooth vertical fade: a small corner-only gradient reads as a stray grey
+  ~ rectangle on light thumbnails instead of as shading.
+  -->
+<shape
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+
+    <gradient
+        android:angle="270"
+        android:endColor="@android:color/transparent"
+        android:startColor="#61000000"
+        android:type="linear" />
+</shape>

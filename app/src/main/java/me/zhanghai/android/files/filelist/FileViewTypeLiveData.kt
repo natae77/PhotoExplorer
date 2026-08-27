@@ -27,12 +27,12 @@ class FileViewTypeLiveData(pathLiveData: LiveData<Path>) : MediatorLiveData<File
         }
     }
 
+    /**
+     * Always stores per folder. The global value is the default for folders the user never changed,
+     * and is only edited from the settings screen. See spec 7.2.
+     */
     fun putValue(value: FileViewType) {
-        if (pathViewTypeLiveData.value != null) {
-            pathViewTypeLiveData.putValue(value)
-        } else {
-            Settings.FILE_LIST_VIEW_TYPE.putValue(value)
-        }
+        pathViewTypeLiveData.putValue(value)
     }
 
     init {

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+  ~ Copyright (c) 2026 PhotoExplorer
+  ~ All Rights Reserved.
+  -->
+
+<!--
+  ~ Date tile, see PersonalDev/Doc/08-media-view-mode-spec.md 4.3. Same square cell as a media tile,
+  ~ but purely decorative: not clickable, not focusable, and with no ripple.
+  -->
+<me.zhanghai.android.files.ui.AspectRatioFrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/itemLayout"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?colorSurfaceVariant"
+    android:clickable="false"
+    android:focusable="false"
+    app:aspectRatio="1.0">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:gravity="center"
+        android:importantForAccessibility="no"
+        android:orientation="vertical"
+        android:padding="@dimen/media_item_date_padding">
+
+        <TextView
+            android:id="@+id/yearText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:maxLines="1"
+            android:textAppearance="?textAppearanceCaption"
+            android:textColor="?android:textColorSecondary" />
+
+        <TextView
+            android:id="@+id/dateText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:maxLines="1"
+            android:textAppearance="?textAppearanceListItem"
+            android:textStyle="bold"
+            app:autoSizeMaxTextSize="16sp"
+            app:autoSizeMinTextSize="9sp"
+            app:autoSizeTextType="uniform" />
+    </LinearLayout>
+</me.zhanghai.android.files.ui.AspectRatioFrameLayout>

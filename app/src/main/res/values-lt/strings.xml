@@ -327,7 +327,6 @@
     <string name="file_list_action_sort_by_last_modified">Paskutinį kartą keista</string>
     <string name="file_list_action_sort_order_ascending">Didėjantis</string>
     <string name="file_list_action_sort_directories_first">Aplankai pirmiausia</string>
-    <string name="file_list_action_view_sort_path_specific">Tik šiam aplankui</string>
     <string name="file_list_action_new_task">Naujas langas</string>
     <string name="file_list_action_navigate_up">Eiti į viršų</string>
     <string name="file_list_action_navigate_to">Eiti į</string>

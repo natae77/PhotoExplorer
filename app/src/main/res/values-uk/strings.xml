@@ -350,7 +350,6 @@
     <string name="file_list_action_sort_by_last_modified">Востаннє змінено</string>
     <string name="file_list_action_sort_order_ascending">Зростання</string>
     <string name="file_list_action_sort_directories_first">Теки спочатку</string>
-    <string name="file_list_action_view_sort_path_specific">Тільки для цієї теки</string>
     <string name="file_list_action_new_task">Нове вікно</string>
     <string name="file_list_action_navigate_up">Перейти вверх</string>
     <string name="file_list_action_navigate_to">Перейти в</string>

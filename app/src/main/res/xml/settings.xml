@@ -47,6 +47,35 @@
             android:defaultValue="@bool/pref_default_value_file_list_animation" />
 
         <rikka.preference.SimpleMenuPreference
+            android:key="@string/pref_key_file_list_view_type"
+            android:title="@string/settings_file_list_view_type_title"
+            android:defaultValue="@string/pref_default_value_file_list_view_type"
+            android:entries="@array/settings_file_list_view_type_entries"
+            android:entryValues="@array/pref_entry_values_file_list_view_type"
+            app:useSimpleSummaryProvider="true" />
+
+        <me.zhanghai.android.files.settings.DefaultSortByPreference
+            android:key="@string/pref_key_file_list_default_sort_by"
+            android:title="@string/settings_file_list_sort_by_title"
+            android:defaultValue="0"
+            android:entries="@array/settings_file_list_sort_by_entries"
+            android:entryValues="@array/pref_entry_values_file_list_sort_by"
+            app:useSimpleSummaryProvider="true" />
+
+        <me.zhanghai.android.files.settings.DefaultSortOrderPreference
+            android:key="@string/pref_key_file_list_default_sort_order"
+            android:title="@string/settings_file_list_sort_order_title"
+            android:defaultValue="0"
+            android:entries="@array/settings_file_list_sort_order_entries"
+            android:entryValues="@array/pref_entry_values_file_list_sort_order"
+            app:useSimpleSummaryProvider="true" />
+
+        <me.zhanghai.android.files.settings.ResetPathSettingsPreference
+            android:key="@string/pref_key_file_list_reset_path_settings"
+            android:title="@string/settings_reset_path_settings_title"
+            android:summary="@string/settings_reset_path_settings_summary" />
+
+        <rikka.preference.SimpleMenuPreference
             android:key="@string/pref_key_file_name_ellipsize"
             android:title="@string/settings_file_name_ellipsize_title"
             android:defaultValue="@string/pref_default_value_file_name_ellipsize"

@@ -261,7 +261,6 @@
     <string name="file_list_action_sort_by_last_modified">Viimeksi muokattu</string>
     <string name="file_list_action_sort_order_ascending">Nouseva</string>
     <string name="file_list_action_sort_directories_first">Kansiot ensin</string>
-    <string name="file_list_action_view_sort_path_specific">Vain tälle kansiolle</string>
     <string name="file_list_action_new_task">Uusi ikkuna</string>
     <string name="file_list_action_navigate_up">Mene ylös</string>
     <string name="file_list_action_navigate_to">Mene…</string>

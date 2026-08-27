@@ -320,7 +320,6 @@
     <string name="file_list_action_sort_by_last_modified">Última modificación</string>
     <string name="file_list_action_sort_order_ascending">Ascendente</string>
     <string name="file_list_action_sort_directories_first">Carpetas primero</string>
-    <string name="file_list_action_view_sort_path_specific">Sólo para esta carpeta</string>
     <string name="file_list_action_new_task">Nueva ventana</string>
     <string name="file_list_action_navigate_up">Subir</string>
     <string name="file_list_action_navigate_to">Ir a</string>

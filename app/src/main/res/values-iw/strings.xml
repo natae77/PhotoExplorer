@@ -348,7 +348,6 @@
     <string name="file_list_action_sort_by_last_modified">השתנה לאחרונה</string>
     <string name="file_list_action_sort_order_ascending">עולה</string>
     <string name="file_list_action_sort_directories_first">תיקיות תחילה</string>
-    <string name="file_list_action_view_sort_path_specific">רק לתיקייה הזאת</string>
     <string name="file_list_action_new_task">חלון חדש</string>
     <string name="file_list_action_navigate_up">עלה</string>
     <string name="file_list_action_navigate_to">מעבר אל</string>

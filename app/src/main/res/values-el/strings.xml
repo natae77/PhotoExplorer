@@ -292,7 +292,6 @@
     <string name="file_list_action_sort_by_last_modified">Τελευταία τροποποίηση</string>
     <string name="file_list_action_sort_order_ascending">Αύξουσα</string>
     <string name="file_list_action_sort_directories_first">Πρώτα οι φάκελοι</string>
-    <string name="file_list_action_view_sort_path_specific">Μόνο για αυτό τον φάκελο</string>
     <string name="file_list_action_new_task">Νέο παράθυρο</string>
     <string name="file_list_action_navigate_up">Μετάβαση επάνω</string>
     <string name="file_list_action_navigate_to">Μετάβαση σε</string>

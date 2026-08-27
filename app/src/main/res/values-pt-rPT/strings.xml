@@ -310,7 +310,6 @@
     <string name="file_list_action_sort_by_last_modified">Última modificação</string>
     <string name="file_list_action_sort_order_ascending">Ascendente</string>
     <string name="file_list_action_sort_directories_first">Pastas primeiro</string>
-    <string name="file_list_action_view_sort_path_specific">Apenas para esta pasta</string>
     <string name="file_list_action_new_task">Nova janela</string>
     <string name="file_list_action_navigate_up">Subir</string>
     <string name="file_list_action_navigate_to">Ir para</string>

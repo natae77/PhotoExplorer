@@ -404,7 +404,6 @@
     <string name="file_list_action_sort_by_last_modified">آخر تعديل</string>
     <string name="file_list_action_sort_order_ascending">تصاعدي</string>
     <string name="file_list_action_sort_directories_first">المجلدات أولًا</string>
-    <string name="file_list_action_view_sort_path_specific">فقط لهذا المجلد</string>
     <string name="file_list_action_new_task">نافذة جديدة</string>
     <string name="file_list_action_navigate_up">اذهب للأعلى</string>
     <string name="file_list_action_navigate_to">اذهب إلى</string>

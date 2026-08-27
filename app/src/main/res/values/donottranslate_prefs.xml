@@ -17,7 +17,31 @@
     <bool name="pref_default_value_file_list_show_hidden_files">false</bool>
     <string name="pref_key_file_list_view_type">key_file_list_view_type</string>
     <string name="pref_default_value_file_list_view_type">0</string>
+    <!--
+      ~ Enums are persisted as the *ordinal* rendered as a string (see EnumSettingLiveData), so
+      ~ these must be numbers, not enum names.
+      -->
+    <string-array name="pref_entry_values_file_list_view_type">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+    </string-array>
+    <string-array name="pref_entry_values_file_list_sort_by">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+    </string-array>
+    <string-array name="pref_entry_values_file_list_sort_order">
+        <item>0</item>
+        <item>1</item>
+    </string-array>
     <string name="pref_key_file_list_sort_options">key_file_list_sort_options</string>
+    <!-- Not real storage keys: these two preferences write into pref_key_file_list_sort_options. -->
+    <string name="pref_key_file_list_default_sort_by">key_file_list_default_sort_by</string>
+    <string name="pref_key_file_list_default_sort_order">key_file_list_default_sort_order</string>
+    <string name="pref_key_file_list_reset_path_settings">key_file_list_reset_path_settings</string>
     <string name="pref_key_create_archive_type">key_create_archive_type</string>
 
     <string name="pref_key_ftp_server_state">key_ftp_server_state</string>

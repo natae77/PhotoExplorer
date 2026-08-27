@@ -336,7 +336,6 @@
     <string name="file_list_action_sort_by_last_modified">Naposledy změněno</string>
     <string name="file_list_action_sort_order_ascending">Vzestupně</string>
     <string name="file_list_action_sort_directories_first">Složky jako první</string>
-    <string name="file_list_action_view_sort_path_specific">Jen pro tuto složku</string>
     <string name="file_list_action_new_task">Nové okno</string>
     <string name="file_list_action_navigate_up">Nahoru</string>
     <string name="file_list_action_navigate_to">Jít na</string>

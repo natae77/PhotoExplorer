@@ -41,12 +41,9 @@ class FileSortOptionsLiveData(pathLiveData: LiveData<Path>) : MediatorLiveData<F
         putValue(valueCompat.copy(isDirectoriesFirst = isDirectoriesFirst))
     }
 
+    /** Always stores per folder, same rule as the view type. See spec 7.2. */
     private fun putValue(value: FileSortOptions) {
-        if (pathSortOptionsLiveData.value != null) {
-            pathSortOptionsLiveData.putValue(value)
-        } else {
-            Settings.FILE_LIST_SORT_OPTIONS.putValue(value)
-        }
+        pathSortOptionsLiveData.putValue(value)
     }
 
     init {

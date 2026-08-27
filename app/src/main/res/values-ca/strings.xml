@@ -282,7 +282,6 @@
     <string name="file_list_action_sort_by_last_modified">Última modificació</string>
     <string name="file_list_action_sort_order_ascending"> Ascendent</string>
     <string name="file_list_action_sort_directories_first">Carpetes primer</string>
-    <string name="file_list_action_view_sort_path_specific">Només per a aquesta carpeta</string>
     <string name="file_list_action_new_task">Finestra nova</string>
     <string name="file_list_action_navigate_up">Puja</string>
     <string name="file_list_action_navigate_to">Ves a</string>

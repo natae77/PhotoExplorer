@@ -120,16 +120,6 @@ class FileListViewModel : ViewModel() {
     fun setSortDirectoriesFirst(isDirectoriesFirst: Boolean) =
         _sortOptionsLiveData.putIsDirectoriesFirst(isDirectoriesFirst)
 
-    private val _viewSortPathSpecificLiveData =
-        FileViewSortPathSpecificLiveData(currentPathLiveData)
-    val viewSortPathSpecificLiveData: LiveData<Boolean>
-        get() = _viewSortPathSpecificLiveData
-    var isViewSortPathSpecific: Boolean
-        get() = _viewSortPathSpecificLiveData.valueCompat
-        set(value) {
-            _viewSortPathSpecificLiveData.putValue(value)
-        }
-
     private val _pickOptionsLiveData = MutableLiveData<PickOptions?>()
     val pickOptionsLiveData: LiveData<PickOptions?>
         get() = _pickOptionsLiveData

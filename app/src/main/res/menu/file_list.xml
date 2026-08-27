@@ -35,6 +35,9 @@
                 <item
                     android:id="@+id/action_view_grid"
                     android:title="@string/file_list_action_view_grid" />
+                <item
+                    android:id="@+id/action_view_media"
+                    android:title="@string/file_list_action_view_media" />
             </group>
             <group
                 android:id="@+id/group_sort"
@@ -52,6 +55,9 @@
                     android:id="@+id/action_sort_by_last_modified"
                     android:title="@string/file_list_action_sort_by_last_modified" />
                 <item
+                    android:id="@+id/action_sort_by_media_created"
+                    android:title="@string/file_list_action_sort_by_media_created" />
+                <item
                     android:id="@+id/action_sort_order_ascending"
                     android:checkable="true"
                     android:title="@string/file_list_action_sort_order_ascending" />
@@ -60,10 +66,6 @@
                     android:checkable="true"
                     android:title="@string/file_list_action_sort_directories_first" />
             </group>
-            <item
-                android:id="@+id/action_view_sort_path_specific"
-                android:checkable="true"
-                android:title="@string/file_list_action_view_sort_path_specific" />
         </menu>
     </item>
 

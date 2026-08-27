@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+  ~ Copyright (c) 2026 PhotoExplorer
+  ~ All Rights Reserved.
+  -->
+
+<me.zhanghai.android.files.ui.CheckableForegroundLinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/itemLayout"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:foreground="?selectableItemBackground"
+    android:orientation="vertical">
+
+    <!-- Square tile, no margins and no rounded corners: media tiles must touch each other. -->
+    <me.zhanghai.android.files.ui.AspectRatioFrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:duplicateParentState="true"
+        app:aspectRatio="1.0">
+
+        <me.zhanghai.android.files.ui.DisabledAlphaImageView
+            android:id="@+id/directoryThumbnailImage"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:duplicateParentState="true"
+            android:scaleType="fitCenter"
+            android:src="@drawable/file_directory_thumbnail" />
+
+        <me.zhanghai.android.files.ui.DisabledAlphaImageView
+            android:id="@+id/thumbnailIconImage"
+            android:layout_width="@dimen/large_icon_size"
+            android:layout_height="@dimen/large_icon_size"
+            android:layout_gravity="center"
+            android:duplicateParentState="true"
+            android:scaleType="centerCrop" />
+
+        <me.zhanghai.android.files.ui.DisabledAlphaImageView
+            android:id="@+id/thumbnailImage"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:duplicateParentState="true"
+            android:scaleType="centerCrop" />
+
+        <!--
+          ~ Selection scrim. Must sit above the thumbnail: the thumbnail fills the whole tile, so
+          ~ the checked *background* used by the list and grid modes would be hidden behind it.
+          -->
+        <View
+            android:id="@+id/selectionOverlayView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/file_item_media_selection_overlay"
+            android:duplicateParentState="true" />
+
+        <!-- Scrim so that the menu button stays visible on top of a bright photo. -->
+        <View
+            android:id="@+id/menuScrimView"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/media_item_scrim_size"
+            android:layout_gravity="top"
+            android:background="@drawable/file_item_media_scrim"
+            android:duplicateParentState="true" />
+
+        <!-- Video indicator, bottom start, no duration per spec 4.1. -->
+        <me.zhanghai.android.files.ui.DisabledAlphaImageView
+            android:id="@+id/videoBadgeImage"
+            android:layout_width="@dimen/media_item_video_badge_size"
+            android:layout_height="@dimen/media_item_video_badge_size"
+            android:layout_gravity="bottom|start"
+            android:layout_margin="@dimen/media_item_video_badge_margin"
+            android:duplicateParentState="true"
+            android:src="@drawable/play_icon_white_24dp" />
+
+        <!-- Selection check mark, replaces the menu button while in selection mode. -->
+        <me.zhanghai.android.files.ui.DisabledAlphaImageView
+            android:id="@+id/checkImage"
+            android:layout_width="@dimen/touch_target_size"
+            android:layout_height="@dimen/touch_target_size"
+            android:layout_gravity="top|end"
+            android:duplicateParentState="true"
+            android:paddingStart="@dimen/media_item_menu_padding_inner"
+            android:paddingTop="@dimen/media_item_menu_padding_outer"
+            android:paddingEnd="@dimen/media_item_menu_padding_outer"
+            android:paddingBottom="@dimen/media_item_menu_padding_inner"
+            android:src="@drawable/checkable_badge_18dp" />
+
+        <!--
+          ~ 48dp touch target pinned to the corner, with asymmetric padding so that the 24dp icon
+          ~ sits only 4dp from the corner: 24 + 4 + 20 = 48. No negative margins, so this does not
+          ~ depend on the parent's clipChildren. See spec 4.1.
+          -->
+        <me.zhanghai.android.foregroundcompat.ForegroundImageButton
+            android:id="@+id/menuButton"
+            android:layout_width="@dimen/touch_target_size"
+            android:layout_height="@dimen/touch_target_size"
+            android:layout_gravity="top|end"
+            android:background="@null"
+            android:foreground="@drawable/selectable_item_background_oval"
+            android:paddingStart="@dimen/media_item_menu_padding_inner"
+            android:paddingTop="@dimen/media_item_menu_padding_outer"
+            android:paddingEnd="@dimen/media_item_menu_padding_outer"
+            android:paddingBottom="@dimen/media_item_menu_padding_inner"
+            android:src="@drawable/more_vertical_icon_white_24dp"
+            app:tint="@android:color/white" />
+
+        <!-- Folder name, one line, only shown for directory tiles. -->
+        <TextView
+            android:id="@+id/nameText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:background="@drawable/file_item_media_name_scrim"
+            android:duplicateParentState="true"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:padding="@dimen/media_item_name_padding"
+            android:textAppearance="?textAppearanceListItemSecondary"
+            android:textColor="@android:color/white" />
+    </me.zhanghai.android.files.ui.AspectRatioFrameLayout>
+</me.zhanghai.android.files.ui.CheckableForegroundLinearLayout>

@@ -31,10 +31,17 @@ data class FileItem(
     val symbolicLinkTarget: String?,
     private val symbolicLinkTargetAttributes: @WriteWith<ParcelableParceler> BasicFileAttributes?,
     val isHidden: Boolean,
-    val mimeType: MimeType
+    val mimeType: MimeType,
+    // Long? instead of Instant/FileTime so that no extra Parceler is needed. Null means "unknown",
+    // callers fall back to the last modified time. See PersonalDev/Doc/09-media-view-mode-plan.md.
+    val mediaCreatedTimeMillis: Long? = null
 ) : Parcelable {
     val attributes: BasicFileAttributes
         get() = symbolicLinkTargetAttributes ?: attributesNoFollowLinks
+
+    /** Media created time if known, last modified time otherwise. Used for sorting and date tiles. */
+    val mediaCreatedTimeMillisOrLastModified: Long
+        get() = mediaCreatedTimeMillis ?: attributes.lastModifiedTime().toMillis()
 
     val isSymbolicLinkBroken: Boolean
         get() {
@@ -51,7 +58,11 @@ fun Path.loadFileItem(): FileItem {
     val isHidden = isHidden
     if (!attributes.isSymbolicLink) {
         val mimeType = AndroidFileTypeDetector.getMimeType(this, attributes).asMimeType()
-        return FileItem(this, nameCollationKey, attributes, null, null, isHidden, mimeType)
+        val mediaCreatedTimeMillis = MediaCreatedTime.read(this, attributes, mimeType)
+        return FileItem(
+            this, nameCollationKey, attributes, null, null, isHidden, mimeType,
+            mediaCreatedTimeMillis
+        )
     }
     val symbolicLinkTarget = readSymbolicLinkByteString().toString()
     val symbolicLinkTargetAttributes = try {
@@ -63,8 +74,10 @@ fun Path.loadFileItem(): FileItem {
     val mimeType = AndroidFileTypeDetector.getMimeType(
         this, symbolicLinkTargetAttributes ?: attributes
     ).asMimeType()
+    val targetAttributes = symbolicLinkTargetAttributes ?: attributes
+    val mediaCreatedTimeMillis = MediaCreatedTime.read(this, targetAttributes, mimeType)
     return FileItem(
         this, nameCollationKey, attributes, symbolicLinkTarget, symbolicLinkTargetAttributes,
-        isHidden, mimeType
+        isHidden, mimeType, mediaCreatedTimeMillis
     )
 }

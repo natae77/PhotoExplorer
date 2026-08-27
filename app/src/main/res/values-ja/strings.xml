@@ -264,7 +264,6 @@
     <string name="file_list_action_sort_by_last_modified">更新日時</string>
     <string name="file_list_action_sort_order_ascending">昇順</string>
     <string name="file_list_action_sort_directories_first">フォルダを先頭に表示する</string>
-    <string name="file_list_action_view_sort_path_specific">このフォルダにのみ適用する</string>
     <string name="file_list_action_new_task">新しいウィンドウ</string>
     <string name="file_list_action_navigate_up">上のパスへ移動</string>
     <string name="file_list_action_navigate_to">パスを入力して移動</string>
