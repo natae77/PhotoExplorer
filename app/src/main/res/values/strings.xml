@@ -700,6 +700,14 @@
     <string name="image_viewer_subtitle_format">%1$,d/%2$,d</string>
     <string name="image_viewer_delete_message_format" translatable="false">@string/file_delete_message_file_format</string>
     <string name="media_viewer_open_with">Open with another app</string>
+    <string name="media_viewer_playback_speed">Playback speed</string>
+    <string name="media_viewer_speed_0_25">0.25\u00d7</string>
+    <string name="media_viewer_speed_0_5">0.5\u00d7</string>
+    <string name="media_viewer_speed_0_75">0.75\u00d7</string>
+    <string name="media_viewer_speed_1">1\u00d7</string>
+    <string name="media_viewer_speed_1_5">1.5\u00d7</string>
+    <string name="media_viewer_speed_2">2\u00d7</string>
+    <string name="media_viewer_speed_format">%1$s\u00d7</string>
     <string name="save_as_title">Save as</string>
     <string name="save_as_error">Error while saving file</string>
     <string name="save_as_success_format">“%1$s” has been saved to “%2$s”</string>

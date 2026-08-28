@@ -22,6 +22,7 @@ import androidx.fragment.app.Fragment
 import androidx.interpolator.view.animation.FastOutSlowInInterpolator
 import androidx.media3.common.C
 import androidx.media3.common.PlaybackException
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.recyclerview.widget.RecyclerView
@@ -141,6 +142,8 @@ class MediaViewerFragment : Fragment(), ConfirmDeleteDialogFragment.Listener {
                     // one would briefly play sound. See spec 11 section 5.1.
                     stopPlaybackIfPageChanged()
                     updatePlayerControlVisibility()
+                    // The playback speed item only exists on video pages.
+                    requireActivity().invalidateOptionsMenu()
                 }
 
                 override fun onPageScrollStateChanged(state: Int) {
@@ -237,6 +240,8 @@ class MediaViewerFragment : Fragment(), ConfirmDeleteDialogFragment.Listener {
         }
         playerView.isVisible = true
         holder.play(path, playerView, viewModel.playbackPositions[path] ?: 0L)
+        // The speed is shared by every video of the session, see spec 11 section 6.3.
+        holder.exoPlayer.setPlaybackSpeed(viewModel.playbackSpeed)
     }
 
     /** Photo pages never show the controls, see spec 11 section 6.2. */
@@ -285,6 +290,17 @@ class MediaViewerFragment : Fragment(), ConfirmDeleteDialogFragment.Listener {
             }
         }
 
+        override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
+            // PlayerControlView has a speed menu of its own, so the speed can change without
+            // setPlaybackSpeed(). Keeping our copy in sync keeps the subtitle and the checked menu
+            // item honest, and stops the next video from reverting the speed.
+            if (playbackParameters.speed != viewModel.playbackSpeed) {
+                viewModel.playbackSpeed = playbackParameters.speed
+                updateTitle()
+                requireActivity().invalidateOptionsMenu()
+            }
+        }
+
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             // A view flag instead of a window flag: it is cleared when the view leaves the window.
             binding.root.keepScreenOn = isPlaying
@@ -318,8 +334,30 @@ class MediaViewerFragment : Fragment(), ConfirmDeleteDialogFragment.Listener {
         inflater.inflate(R.menu.media_viewer, menu)
     }
 
+    override fun onPrepareOptionsMenu(menu: Menu) {
+        super.onPrepareOptionsMenu(menu)
+
+        val isVideo = currentPath.isPlayableVideo
+        menu.findItem(R.id.action_playback_speed).isVisible = isVideo
+        if (isVideo) {
+            // indexOf() is not available for FloatArray because of NaN.
+            val index = PLAYBACK_SPEEDS.indexOfFirst { it == viewModel.playbackSpeed }
+            // Only the matching item is touched: in a checkableBehavior="single" group,
+            // setChecked(false) also makes that item the checked one (MenuItemImpl.setChecked()).
+            if (index != -1) {
+                menu.findItem(SPEED_ITEM_IDS[index]).isChecked = true
+            }
+        }
+    }
+
     override fun onOptionsItemSelected(item: MenuItem): Boolean =
         when (item.itemId) {
+            R.id.action_speed_0_25 -> { setPlaybackSpeed(0.25f); true }
+            R.id.action_speed_0_5 -> { setPlaybackSpeed(0.5f); true }
+            R.id.action_speed_0_75 -> { setPlaybackSpeed(0.75f); true }
+            R.id.action_speed_1 -> { setPlaybackSpeed(1f); true }
+            R.id.action_speed_1_5 -> { setPlaybackSpeed(1.5f); true }
+            R.id.action_speed_2 -> { setPlaybackSpeed(2f); true }
             R.id.action_delete -> {
                 confirmDelete()
                 true
@@ -360,18 +398,52 @@ class MediaViewerFragment : Fragment(), ConfirmDeleteDialogFragment.Listener {
         binding.viewPager.doOnPreDraw { binding.viewPager.requestTransform() }
     }
 
+    private fun setPlaybackSpeed(speed: Float) {
+        viewModel.playbackSpeed = speed
+        playerHolder?.exoPlayer?.setPlaybackSpeed(speed)
+        updateTitle()
+    }
+
     private fun updateTitle() {
         val path = currentPath
         requireActivity().title = path.fileName.toString()
         val size = paths.size
-        binding.toolbar.subtitle = if (size > 1) {
+        val countText = if (size > 1) {
+            // The key is still image_viewer_*, see plan 12 1.5.
             getString(
                 R.string.image_viewer_subtitle_format, binding.viewPager.currentItem + 1, size
             )
         } else {
             null
         }
+        // Show the speed only when it is not 1x, see spec 11 section 6.3.
+        val speedText = if (path.isPlayableVideo && viewModel.playbackSpeed != 1f) {
+            formatPlaybackSpeed(viewModel.playbackSpeed)
+        } else {
+            null
+        }
+        binding.toolbar.subtitle = listOfNotNull(countText, speedText).joinToString("  ")
+            .ifEmpty { null }
     }
+
+    private fun formatPlaybackSpeed(speed: Float): String =
+        when (speed) {
+            0.25f -> getString(R.string.media_viewer_speed_0_25)
+            0.5f -> getString(R.string.media_viewer_speed_0_5)
+            0.75f -> getString(R.string.media_viewer_speed_0_75)
+            1f -> getString(R.string.media_viewer_speed_1)
+            1.5f -> getString(R.string.media_viewer_speed_1_5)
+            2f -> getString(R.string.media_viewer_speed_2)
+            // PlayerControlView has a speed menu of its own with values we do not offer.
+            else -> getString(
+                R.string.media_viewer_speed_format,
+                if (speed == speed.toInt().toFloat()) {
+                    speed.toInt().toString()
+                } else {
+                    speed.toString()
+                }
+            )
+        }
 
     private fun share() {
         val path = currentPath
@@ -383,6 +455,16 @@ class MediaViewerFragment : Fragment(), ConfirmDeleteDialogFragment.Listener {
 
     private val currentPath: Path
         get() = paths[binding.viewPager.currentItem]
+
+    companion object {
+        // Spec 11 section 6.3. 0.25 is there to slow fast motion down, e.g. a golf swing.
+        private val PLAYBACK_SPEEDS = floatArrayOf(0.25f, 0.5f, 0.75f, 1f, 1.5f, 2f)
+
+        private val SPEED_ITEM_IDS = intArrayOf(
+            R.id.action_speed_0_25, R.id.action_speed_0_5, R.id.action_speed_0_75,
+            R.id.action_speed_1, R.id.action_speed_1_5, R.id.action_speed_2
+        )
+    }
 
     @Parcelize
     class Args(val intent: Intent, val position: Int) : ParcelableArgs
