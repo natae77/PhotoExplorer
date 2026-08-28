@@ -30,6 +30,9 @@ Windows 11에서 실제로 겪고 검증한 내용만 정리했다.
 | [07-windows-gitbash-adb-pitfalls.md](07-windows-gitbash-adb-pitfalls.md) | Windows/Git Bash에서 adb 스크립팅 함정 |
 | [08-media-view-mode-spec.md](08-media-view-mode-spec.md) | 미디어 보기 모드 추가 기획서 (목록/바둑판/미디어, 날짜 타일) |
 | [09-media-view-mode-plan.md](09-media-view-mode-plan.md) | 미디어 보기 모드 구현 계획 (0~7단계) |
+| [10-image-viewer-swipe-down.md](10-image-viewer-swipe-down.md) | 미디어 뷰어에서 아래로 스와이프해 닫기 (사진·동영상 페이지 모두) |
+| [11-video-viewer-spec.md](11-video-viewer-spec.md) | 동영상 뷰어 기획서 — 앱 안에서 재생, 슬라이더·속도 조절·세부 정보 |
+| [12-video-viewer-plan.md](12-video-viewer-plan.md) | 동영상 뷰어 구현 계획 (0~9단계) |
 | [media-view-mode-open-items.md](media-view-mode-open-items.md) | 09번 계획서의 미결 항목 — 누락·미결정·문서 모순 (착수 전 확인) |
 
 ## 핵심 요약 (급할 때 여기만)
