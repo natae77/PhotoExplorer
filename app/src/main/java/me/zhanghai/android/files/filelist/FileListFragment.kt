@@ -131,6 +131,7 @@ import me.zhanghai.android.files.util.valueCompat
 import me.zhanghai.android.files.util.viewModels
 import me.zhanghai.android.files.util.withChooser
 import me.zhanghai.android.files.viewer.media.MediaViewerActivity
+import me.zhanghai.android.files.viewer.media.isPlayableVideo
 import kotlin.math.roundToInt
 
 class FileListFragment : Fragment(), BreadcrumbLayout.Listener, FileListAdapter.Listener,
@@ -1320,11 +1321,29 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, FileListAdapter.
             openApk(file)
             return
         }
+        // Playable videos open in our own viewer. There is no video/* intent filter (spec 11 D4),
+        // so the implicit view intent below would always land in another app.
+        if (file.path.isPlayableVideo) {
+            openMediaViewer(file)
+            return
+        }
         if (file.isListable) {
             navigateTo(file.listablePath)
             return
         }
         openFileWithIntent(file, false)
+    }
+
+    private fun openMediaViewer(file: FileItem) {
+        val intent = MediaViewerActivity::class.createIntent()
+            .apply { extraPath = file.path }
+        if (!maybeAddMediaViewerExtras(intent, file.path, file.mimeType)) {
+            // See plan 12 2.2.1: without a page list the viewer would close itself immediately,
+            // and an explicit intent has no other app to fall back to.
+            openFileWithIntent(file, false)
+            return
+        }
+        startActivitySafe(intent)
     }
 
     private fun openApk(file: FileItem) {
@@ -1390,9 +1409,15 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, FileListAdapter.
         }
     }
 
-    private fun maybeAddMediaViewerExtras(intent: Intent, path: Path, mimeType: MimeType) {
-        if (!mimeType.isImage) {
-            return
+    /** Returns whether the viewer got a page list, see plan 12 2.2.1. */
+    private fun maybeAddMediaViewerExtras(
+        intent: Intent,
+        path: Path,
+        mimeType: MimeType
+    ): Boolean {
+        // Videos we cannot play in-app keep going to an external player, see spec 11 section 3.
+        if (!(mimeType.isImage || path.isPlayableVideo)) {
+            return false
         }
         var paths = mutableListOf<Path>()
         // We need the ordered list from our adapter instead of the list from FileListLiveData.
@@ -1402,13 +1427,13 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, FileListAdapter.
             val item = adapter.getItem(index) as? FileListItem.File ?: continue
             val file = item.file
             val filePath = file.path
-            if (file.mimeType.isImage || filePath == path) {
+            if (file.mimeType.isImage || filePath.isPlayableVideo || filePath == path) {
                 paths.add(filePath)
             }
         }
         var position = paths.indexOf(path)
         if (position == -1) {
-            return
+            return false
         }
         // HACK: Don't send too many paths to avoid TransactionTooLargeException.
         if (paths.size > MEDIA_VIEWER_PATH_LIST_SIZE_MAX) {
@@ -1418,6 +1443,7 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, FileListAdapter.
             position -= start
         }
         MediaViewerActivity.putExtras(intent, paths, position)
+        return true
     }
 
     override fun cutFile(file: FileItem) {

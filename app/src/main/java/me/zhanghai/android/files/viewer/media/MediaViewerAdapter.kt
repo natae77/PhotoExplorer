@@ -25,6 +25,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import me.zhanghai.android.files.coil.fadeIn
 import me.zhanghai.android.files.databinding.MediaViewerImageItemBinding
+import me.zhanghai.android.files.databinding.MediaViewerVideoItemBinding
 import me.zhanghai.android.files.file.MimeType
 import me.zhanghai.android.files.file.asMimeType
 import me.zhanghai.android.files.file.asMimeTypeOrNull
@@ -42,29 +43,83 @@ import kotlin.math.max
 class MediaViewerAdapter(
     private val lifecycleOwner: LifecycleOwner,
     private val listener: (View) -> Unit
-) : SimpleAdapter<Path, MediaViewerAdapter.ViewHolder>() {
+) : SimpleAdapter<Path, RecyclerView.ViewHolder>() {
     override val hasStableIds: Boolean
         get() = true
 
     override fun getItemId(position: Int): Long = getItem(position).hashCode().toLong()
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder =
-        ViewHolder(MediaViewerImageItemBinding.inflate(parent.context.layoutInflater, parent, false))
+    override fun getItemViewType(position: Int): Int =
+        if (getItem(position).isPlayableVideo) VIEW_TYPE_VIDEO else VIEW_TYPE_IMAGE
 
-    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
+        val inflater = parent.context.layoutInflater
+        return when (viewType) {
+            VIEW_TYPE_VIDEO ->
+                VideoViewHolder(MediaViewerVideoItemBinding.inflate(inflater, parent, false))
+            else -> ImageViewHolder(MediaViewerImageItemBinding.inflate(inflater, parent, false))
+        }
+    }
+
+    override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         val path = getItem(position)
-        val binding = holder.binding
+        when (holder) {
+            is ImageViewHolder -> bindImage(holder.binding, path)
+            is VideoViewHolder -> bindVideo(holder.binding, path)
+            else -> throw IllegalStateException(holder.toString())
+        }
+    }
+
+    override fun onViewRecycled(holder: RecyclerView.ViewHolder) {
+        super.onViewRecycled(holder)
+
+        when (holder) {
+            is ImageViewHolder -> {
+                holder.binding.image.dispose()
+                holder.binding.largeImage.recycle()
+            }
+            is VideoViewHolder -> {
+                holder.binding.thumbnailImage.dispose()
+                // The player is detached by the fragment, not here.
+            }
+        }
+    }
+
+    private fun bindImage(binding: MediaViewerImageItemBinding, path: Path) {
         binding.image.setOnPhotoTapListener { view, _, _ -> listener(view) }
         binding.largeImage.setOnClickListener(listener)
         loadImage(binding, path)
     }
 
-    override fun onViewRecycled(holder: ViewHolder) {
-        super.onViewRecycled(holder)
-
-        val binding = holder.binding
-        binding.image.dispose()
-        binding.largeImage.recycle()
+    private fun bindVideo(binding: MediaViewerVideoItemBinding, path: Path) {
+        binding.root.setOnClickListener(listener)
+        binding.playerView.isVisible = false
+        binding.errorLayout.isVisible = false
+        // The fragment fades the thumbnail out once the first frame is rendered, and that
+        // animation may still be running when this page comes back. See plan 12 3.3.
+        binding.thumbnailImage.animate().cancel()
+        binding.thumbnailImage.isVisible = true
+        binding.thumbnailImage.alpha = 1f
+        binding.progress.fadeInUnsafe(true)
+        lifecycleOwner.lifecycleScope.launch {
+            val attributes = try {
+                withContext(Dispatchers.IO) {
+                    path.readAttributes(BasicFileAttributes::class.java)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                binding.progress.fadeOutUnsafe()
+                return@launch
+            }
+            binding.thumbnailImage.load(path to attributes) {
+                size(Size.ORIGINAL)
+                fadeIn(binding.thumbnailImage.context.shortAnimTime)
+                listener(
+                    onSuccess = { _, _ -> binding.progress.fadeOutUnsafe() },
+                    onError = { _, _ -> binding.progress.fadeOutUnsafe() }
+                )
+            }
+        }
     }
 
     private fun loadImage(binding: MediaViewerImageItemBinding, path: Path) {
@@ -179,11 +234,18 @@ class MediaViewerAdapter(
     }
 
     companion object {
+        private const val VIEW_TYPE_IMAGE = 0
+        private const val VIEW_TYPE_VIDEO = 1
+
         // @see android.graphics.RecordingCanvas#MAX_BITMAP_SIZE
         private const val MAX_BITMAP_SIZE = 100 * 1024 * 1024
     }
 
-    class ViewHolder(val binding: MediaViewerImageItemBinding) : RecyclerView.ViewHolder(binding.root)
+    class ImageViewHolder(val binding: MediaViewerImageItemBinding) :
+        RecyclerView.ViewHolder(binding.root)
+
+    class VideoViewHolder(val binding: MediaViewerVideoItemBinding) :
+        RecyclerView.ViewHolder(binding.root)
 
     private class ImageInfo(
         val attributes: BasicFileAttributes,
