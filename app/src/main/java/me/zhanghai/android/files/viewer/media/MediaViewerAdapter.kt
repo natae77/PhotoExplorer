@@ -5,8 +5,13 @@
 
 package me.zhanghai.android.files.viewer.media
 
+import android.annotation.SuppressLint
+import android.content.Context
 import android.graphics.BitmapFactory
+import android.view.GestureDetector
+import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.ViewGroup
 import androidx.core.view.isVisible
 import androidx.lifecycle.LifecycleOwner
@@ -38,11 +43,13 @@ import me.zhanghai.android.files.util.fadeInUnsafe
 import me.zhanghai.android.files.util.fadeOutUnsafe
 import me.zhanghai.android.files.util.layoutInflater
 import me.zhanghai.android.files.util.shortAnimTime
+import kotlin.math.abs
 import kotlin.math.max
 
 class MediaViewerAdapter(
     private val lifecycleOwner: LifecycleOwner,
-    private val listener: (View) -> Unit
+    private val listener: (View) -> Unit,
+    private val onSwipeDown: () -> Unit
 ) : SimpleAdapter<Path, RecyclerView.ViewHolder>() {
     override val hasStableIds: Boolean
         get() = true
@@ -55,9 +62,26 @@ class MediaViewerAdapter(
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
         val inflater = parent.context.layoutInflater
         return when (viewType) {
-            VIEW_TYPE_VIDEO ->
-                VideoViewHolder(MediaViewerVideoItemBinding.inflate(inflater, parent, false))
-            else -> ImageViewHolder(MediaViewerImageItemBinding.inflate(inflater, parent, false))
+            VIEW_TYPE_VIDEO -> {
+                val binding = MediaViewerVideoItemBinding.inflate(inflater, parent, false)
+                // A video page has no zoom, so nothing has to be ruled out here. The playback
+                // controls sit in the fragment layout above the pager and take their own touches,
+                // so dragging the slider never reaches this. See doc 10 section 4.4.
+                binding.root.setSwipeDownDetector { true }
+                VideoViewHolder(binding)
+            }
+            else -> {
+                val binding = MediaViewerImageItemBinding.inflate(inflater, parent, false)
+                // SubsamplingScaleImageView has no fling listener of its own, so watch its touch
+                // events instead. PhotoView has one, and is done in bindImage().
+                binding.largeImage.setSwipeDownDetector {
+                    val largeImage = binding.largeImage
+                    // Panning a zoomed image isn't a swipe down.
+                    largeImage.isReady
+                        && largeImage.scale <= largeImage.minScale * SWIPE_DOWN_MIN_SCALE_SLOP
+                }
+                ImageViewHolder(binding)
+            }
         }
     }
 
@@ -87,6 +111,15 @@ class MediaViewerAdapter(
 
     private fun bindImage(binding: MediaViewerImageItemBinding, path: Path) {
         binding.image.setOnPhotoTapListener { view, _, _ -> listener(view) }
+        // PhotoView only calls this when the image isn't zoomed and only one finger is down.
+        binding.image.setOnSingleFlingListener { _, _, velocityX, velocityY ->
+            if (isSwipeDown(binding.image.context, velocityX, velocityY)) {
+                onSwipeDown()
+                true
+            } else {
+                false
+            }
+        }
         binding.largeImage.setOnClickListener(listener)
         loadImage(binding, path)
     }
@@ -225,6 +258,50 @@ class MediaViewerAdapter(
             return max(viewWidth.toFloat() / imageWidth, viewHeight.toFloat() / imageHeight)
         }
 
+    /**
+     * Tells a downward flick that should close the viewer apart from the horizontal flick that
+     * pages through images.
+     */
+    private fun isSwipeDown(context: Context, velocityX: Float, velocityY: Float): Boolean {
+        val minimumVelocity = ViewConfiguration.get(context).scaledMinimumFlingVelocity *
+            SWIPE_DOWN_VELOCITY_FACTOR
+        return velocityY >= minimumVelocity && velocityY > abs(velocityX)
+    }
+
+    /**
+     * Closes the viewer on a downward flick over this view, unless [isSwipeAllowed] says the view
+     * is busy with a gesture of its own.
+     *
+     * The touch listener never consumes an event, so the view keeps handling its own gestures.
+     */
+    @SuppressLint("ClickableViewAccessibility")
+    private fun View.setSwipeDownDetector(isSwipeAllowed: () -> Boolean) {
+        val gestureDetector = GestureDetector(
+            context,
+            object : GestureDetector.SimpleOnGestureListener() {
+                override fun onFling(
+                    e1: MotionEvent?,
+                    e2: MotionEvent,
+                    velocityX: Float,
+                    velocityY: Float
+                ): Boolean {
+                    if (e1 == null || e1.pointerCount > 1 || e2.pointerCount > 1) {
+                        return false
+                    }
+                    if (!isSwipeAllowed() || !isSwipeDown(context, velocityX, velocityY)) {
+                        return false
+                    }
+                    onSwipeDown()
+                    return true
+                }
+            }
+        )
+        setOnTouchListener { _, event ->
+            gestureDetector.onTouchEvent(event)
+            false
+        }
+    }
+
     private fun showError(binding: MediaViewerImageItemBinding, throwable: Throwable) {
         binding.progress.fadeOutUnsafe()
         binding.errorText.text = throwable.toString()
@@ -239,6 +316,12 @@ class MediaViewerAdapter(
 
         // @see android.graphics.RecordingCanvas#MAX_BITMAP_SIZE
         private const val MAX_BITMAP_SIZE = 100 * 1024 * 1024
+
+        // A fling has to be this many times the minimum fling velocity to close the viewer, so
+        // that slowly dragging down doesn't. Tune this if it triggers too easily, or not enough.
+        private const val SWIPE_DOWN_VELOCITY_FACTOR = 4
+        // Leeway for comparing floating point scales.
+        private const val SWIPE_DOWN_MIN_SCALE_SLOP = 1.01f
     }
 
     class ImageViewHolder(val binding: MediaViewerImageItemBinding) :

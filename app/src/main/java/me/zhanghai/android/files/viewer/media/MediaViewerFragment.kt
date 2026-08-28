@@ -135,9 +135,12 @@ class MediaViewerFragment :
         }
         // This will set up window flags.
         systemUiHelper.show()
-        adapter = MediaViewerAdapter(viewLifecycleOwner) { systemUiHelper.toggle() }.apply {
-            replace(paths)
-        }
+        adapter = MediaViewerAdapter(
+            viewLifecycleOwner,
+            { systemUiHelper.toggle() },
+            // Swiping down should be the same as pressing back.
+            { activity.onBackPressedDispatcher.onBackPressed() }
+        ).apply { replace(paths) }
         binding.viewPager.apply {
             // 1 is the default for the old androidx.viewpager.widget.ViewPager.
             offscreenPageLimit = 1
