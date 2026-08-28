@@ -68,6 +68,8 @@ class MediaViewerFragment : Fragment(), ConfirmDeleteDialogFragment.Listener {
 
     private var playerHolder: VideoPlayerHolder? = null
 
+    private var isSystemUiVisible = true
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -100,15 +102,21 @@ class MediaViewerFragment : Fragment(), ConfirmDeleteDialogFragment.Listener {
         // Our app bar will draw the status bar background.
         activity.window.statusBarColor = Color.TRANSPARENT
         binding.appBarLayout.applySystemWindowInsetsToPadding(left = true, top = true, right = true)
+        binding.playerControlView.applySystemWindowInsetsToPadding(
+            left = true, bottom = true, right = true
+        )
         systemUiHelper = SystemUiHelper(
             activity, SystemUiHelper.LEVEL_IMMERSIVE, SystemUiHelper.FLAG_IMMERSIVE_STICKY
         ) { visible: Boolean ->
+            isSystemUiVisible = visible
             binding.appBarLayout.animate()
                 .alpha(if (visible) 1f else 0f)
                 .translationY(if (visible) 0f else -binding.appBarLayout.bottom.toFloat())
                 .setDuration(mediumAnimTime.toLong())
                 .setInterpolator(FastOutSlowInInterpolator())
                 .start()
+            // The controls ride with the app bar, see spec 11 section 6.2.
+            updatePlayerControlVisibility()
         }
         // This will set up window flags.
         systemUiHelper.show()
@@ -128,6 +136,7 @@ class MediaViewerFragment : Fragment(), ConfirmDeleteDialogFragment.Listener {
                     // Do not start here. Fast flinging fires this for every page passed, and each
                     // one would briefly play sound. See spec 11 section 5.1.
                     stopPlaybackIfPageChanged()
+                    updatePlayerControlVisibility()
                 }
 
                 override fun onPageScrollStateChanged(state: Int) {
@@ -184,13 +193,32 @@ class MediaViewerFragment : Fragment(), ConfirmDeleteDialogFragment.Listener {
         }
         val playerView = currentVideoBinding?.playerView ?: return
         val holder = playerHolder ?: VideoPlayerHolder(requireContext(), playerListener)
-            .also { playerHolder = it }
+            .also {
+                playerHolder = it
+                binding.playerControlView.player = it.exoPlayer
+                // Otherwise the picture stands still until the finger is lifted.
+                binding.playerControlView.setTimeBarScrubbingEnabled(true)
+            }
         // Already on this page: leave it alone, see plan 12 3.2.1.
         if (holder.currentPath == path) {
             return
         }
         playerView.isVisible = true
         holder.play(path, playerView, 0L)
+    }
+
+    /** Photo pages never show the controls, see spec 11 section 6.2. */
+    private fun updatePlayerControlVisibility() {
+        // PlayerControlView.isVisible() is its own read-only method, so the View extension
+        // property of the same name is not usable here.
+        val controlView = binding.playerControlView
+        if (isSystemUiVisible && currentPath.isPlayableVideo) {
+            controlView.visibility = View.VISIBLE
+            controlView.show()
+        } else {
+            controlView.hide()
+            controlView.visibility = View.GONE
+        }
     }
 
     /** The binding of the current page, or null when it is not a bound video page. */
@@ -229,6 +257,9 @@ class MediaViewerFragment : Fragment(), ConfirmDeleteDialogFragment.Listener {
         }
 
         updateTitle()
+        // onPageSelected() never fires for the initial page because the callback is registered
+        // after setCurrentItem(), which is also why updateTitle() is called here.
+        updatePlayerControlVisibility()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
