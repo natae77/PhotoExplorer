@@ -3,7 +3,7 @@
  * All Rights Reserved.
  */
 
-package me.zhanghai.android.files.viewer.image
+package me.zhanghai.android.files.viewer.media
 
 import android.app.Dialog
 import android.os.Bundle

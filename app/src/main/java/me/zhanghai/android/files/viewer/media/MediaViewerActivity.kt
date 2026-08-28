@@ -3,7 +3,7 @@
  * All Rights Reserved.
  */
 
-package me.zhanghai.android.files.viewer.image
+package me.zhanghai.android.files.viewer.media
 
 import android.content.Intent
 import android.os.Bundle
@@ -14,7 +14,7 @@ import me.zhanghai.android.files.app.AppActivity
 import me.zhanghai.android.files.util.extraPathList
 import me.zhanghai.android.files.util.putArgs
 
-class ImageViewerActivity : AppActivity() {
+class MediaViewerActivity : AppActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -23,14 +23,14 @@ class ImageViewerActivity : AppActivity() {
         if (savedInstanceState == null) {
             val intent = intent
             val position = intent.getIntExtra(EXTRA_POSITION, 0)
-            val fragment = ImageViewerFragment()
-                .putArgs(ImageViewerFragment.Args(intent, position))
+            val fragment = MediaViewerFragment()
+                .putArgs(MediaViewerFragment.Args(intent, position))
             supportFragmentManager.commit { add(android.R.id.content, fragment) }
         }
     }
 
     companion object {
-        private val EXTRA_POSITION = "${ImageViewerActivity::class.java.name}.extra.POSITION"
+        private val EXTRA_POSITION = "${MediaViewerActivity::class.java.name}.extra.POSITION"
 
         fun putExtras(intent: Intent, paths: List<Path>, position: Int) {
             // All extra put here must be framework classes, or we may crash the resolver activity.

@@ -3,7 +3,7 @@
  * All Rights Reserved.
  */
 
-package me.zhanghai.android.files.viewer.image
+package me.zhanghai.android.files.viewer.media
 
 import android.graphics.BitmapFactory
 import android.view.View
@@ -24,7 +24,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import me.zhanghai.android.files.coil.fadeIn
-import me.zhanghai.android.files.databinding.ImageViewerItemBinding
+import me.zhanghai.android.files.databinding.MediaViewerImageItemBinding
 import me.zhanghai.android.files.file.MimeType
 import me.zhanghai.android.files.file.asMimeType
 import me.zhanghai.android.files.file.asMimeTypeOrNull
@@ -39,17 +39,17 @@ import me.zhanghai.android.files.util.layoutInflater
 import me.zhanghai.android.files.util.shortAnimTime
 import kotlin.math.max
 
-class ImageViewerAdapter(
+class MediaViewerAdapter(
     private val lifecycleOwner: LifecycleOwner,
     private val listener: (View) -> Unit
-) : SimpleAdapter<Path, ImageViewerAdapter.ViewHolder>() {
+) : SimpleAdapter<Path, MediaViewerAdapter.ViewHolder>() {
     override val hasStableIds: Boolean
         get() = true
 
     override fun getItemId(position: Int): Long = getItem(position).hashCode().toLong()
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder =
-        ViewHolder(ImageViewerItemBinding.inflate(parent.context.layoutInflater, parent, false))
+        ViewHolder(MediaViewerImageItemBinding.inflate(parent.context.layoutInflater, parent, false))
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val path = getItem(position)
@@ -67,7 +67,7 @@ class ImageViewerAdapter(
         binding.largeImage.recycle()
     }
 
-    private fun loadImage(binding: ImageViewerItemBinding, path: Path) {
+    private fun loadImage(binding: MediaViewerImageItemBinding, path: Path) {
         binding.progress.fadeInUnsafe(true)
         binding.errorText.fadeOutUnsafe()
         binding.image.isVisible = false
@@ -96,7 +96,7 @@ class ImageViewerAdapter(
     }
 
     private fun loadImageWithInfo(
-        binding: ImageViewerItemBinding,
+        binding: MediaViewerImageItemBinding,
         path: Path,
         imageInfo: ImageInfo
     ) {
@@ -170,7 +170,7 @@ class ImageViewerAdapter(
             return max(viewWidth.toFloat() / imageWidth, viewHeight.toFloat() / imageHeight)
         }
 
-    private fun showError(binding: ImageViewerItemBinding, throwable: Throwable) {
+    private fun showError(binding: MediaViewerImageItemBinding, throwable: Throwable) {
         binding.progress.fadeOutUnsafe()
         binding.errorText.text = throwable.toString()
         binding.errorText.fadeInUnsafe(true)
@@ -183,7 +183,7 @@ class ImageViewerAdapter(
         private const val MAX_BITMAP_SIZE = 100 * 1024 * 1024
     }
 
-    class ViewHolder(val binding: ImageViewerItemBinding) : RecyclerView.ViewHolder(binding.root)
+    class ViewHolder(val binding: MediaViewerImageItemBinding) : RecyclerView.ViewHolder(binding.root)
 
     private class ImageInfo(
         val attributes: BasicFileAttributes,

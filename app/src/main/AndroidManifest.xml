@@ -336,7 +336,7 @@
         </activity>
 
         <activity
-            android:name="me.zhanghai.android.files.viewer.image.ImageViewerActivity"
+            android:name="me.zhanghai.android.files.viewer.media.MediaViewerActivity"
             android:exported="true"
             android:label="@string/image_viewer_title"
             android:theme="@style/Theme.MaterialFiles.Immersive">

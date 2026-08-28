@@ -3,7 +3,7 @@
  * All Rights Reserved.
  */
 
-package me.zhanghai.android.files.viewer.image
+package me.zhanghai.android.files.viewer.media
 
 import android.content.Intent
 import android.graphics.Color
@@ -24,7 +24,7 @@ import java8.nio.file.Path
 import kotlinx.parcelize.Parcelize
 import kotlinx.parcelize.WriteWith
 import me.zhanghai.android.files.R
-import me.zhanghai.android.files.databinding.ImageViewerFragmentBinding
+import me.zhanghai.android.files.databinding.MediaViewerFragmentBinding
 import me.zhanghai.android.files.file.fileProviderUri
 import me.zhanghai.android.files.provider.common.delete
 import me.zhanghai.android.files.ui.DepthPageTransformer
@@ -45,17 +45,17 @@ import me.zhanghai.android.files.util.withChooser
 import me.zhanghai.android.systemuihelper.SystemUiHelper
 import java.io.IOException
 
-class ImageViewerFragment : Fragment(), ConfirmDeleteDialogFragment.Listener {
+class MediaViewerFragment : Fragment(), ConfirmDeleteDialogFragment.Listener {
     private val args by args<Args>()
     private val argsPaths by lazy { args.intent.extraPathList }
 
     private lateinit var paths: MutableList<Path>
 
-    private lateinit var binding: ImageViewerFragmentBinding
+    private lateinit var binding: MediaViewerFragmentBinding
 
     private lateinit var systemUiHelper: SystemUiHelper
 
-    private lateinit var adapter: ImageViewerAdapter
+    private lateinit var adapter: MediaViewerAdapter
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -70,7 +70,7 @@ class ImageViewerFragment : Fragment(), ConfirmDeleteDialogFragment.Listener {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View =
-        ImageViewerFragmentBinding.inflate(inflater, container, false)
+        MediaViewerFragmentBinding.inflate(inflater, container, false)
             .also { binding = it }
             .root
 
@@ -101,13 +101,13 @@ class ImageViewerFragment : Fragment(), ConfirmDeleteDialogFragment.Listener {
         }
         // This will set up window flags.
         systemUiHelper.show()
-        adapter = ImageViewerAdapter(viewLifecycleOwner) { systemUiHelper.toggle() }.apply {
+        adapter = MediaViewerAdapter(viewLifecycleOwner) { systemUiHelper.toggle() }.apply {
             replace(paths)
         }
         binding.viewPager.apply {
             // 1 is the default for the old androidx.viewpager.widget.ViewPager.
             offscreenPageLimit = 1
-            adapter = this@ImageViewerFragment.adapter
+            adapter = this@MediaViewerFragment.adapter
             // ViewPager saves its position and will restore it later.
             setCurrentItem(args.position, false)
             setPageTransformer(DepthPageTransformer)
@@ -140,7 +140,7 @@ class ImageViewerFragment : Fragment(), ConfirmDeleteDialogFragment.Listener {
     override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
         super.onCreateOptionsMenu(menu, inflater)
 
-        inflater.inflate(R.menu.image_viewer, menu)
+        inflater.inflate(R.menu.media_viewer, menu)
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean =
