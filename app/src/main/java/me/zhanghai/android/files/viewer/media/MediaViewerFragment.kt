@@ -14,10 +14,16 @@ import android.view.MenuInflater
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
+import androidx.annotation.OptIn
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.doOnPreDraw
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.interpolator.view.animation.FastOutSlowInInterpolator
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
+import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
 import dev.chrisbanes.insetter.applySystemWindowInsetsToPadding
 import java8.nio.file.Path
@@ -25,6 +31,7 @@ import kotlinx.parcelize.Parcelize
 import kotlinx.parcelize.WriteWith
 import me.zhanghai.android.files.R
 import me.zhanghai.android.files.databinding.MediaViewerFragmentBinding
+import me.zhanghai.android.files.databinding.MediaViewerVideoItemBinding
 import me.zhanghai.android.files.file.fileProviderUri
 import me.zhanghai.android.files.provider.common.delete
 import me.zhanghai.android.files.ui.DepthPageTransformer
@@ -35,6 +42,7 @@ import me.zhanghai.android.files.util.args
 import me.zhanghai.android.files.util.createSendImageIntent
 import me.zhanghai.android.files.util.extraPath
 import me.zhanghai.android.files.util.extraPathList
+import me.zhanghai.android.files.util.fadeOutUnsafe
 import me.zhanghai.android.files.util.finish
 import me.zhanghai.android.files.util.getState
 import me.zhanghai.android.files.util.mediumAnimTime
@@ -45,6 +53,7 @@ import me.zhanghai.android.files.util.withChooser
 import me.zhanghai.android.systemuihelper.SystemUiHelper
 import java.io.IOException
 
+@OptIn(UnstableApi::class)
 class MediaViewerFragment : Fragment(), ConfirmDeleteDialogFragment.Listener {
     private val args by args<Args>()
     private val argsPaths by lazy { args.intent.extraPathList }
@@ -56,6 +65,8 @@ class MediaViewerFragment : Fragment(), ConfirmDeleteDialogFragment.Listener {
     private lateinit var systemUiHelper: SystemUiHelper
 
     private lateinit var adapter: MediaViewerAdapter
+
+    private var playerHolder: VideoPlayerHolder? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -114,8 +125,97 @@ class MediaViewerFragment : Fragment(), ConfirmDeleteDialogFragment.Listener {
             registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
                 override fun onPageSelected(position: Int) {
                     updateTitle()
+                    // Do not start here. Fast flinging fires this for every page passed, and each
+                    // one would briefly play sound. See spec 11 section 5.1.
+                    stopPlaybackIfPageChanged()
+                }
+
+                override fun onPageScrollStateChanged(state: Int) {
+                    if (state == ViewPager2.SCROLL_STATE_IDLE) {
+                        startPlaybackIfVideoPage()
+                    }
                 }
             })
+            // The initial page never scrolls, so SCROLL_STATE_IDLE never arrives for it.
+            // See plan 12 3.2.2.
+            doOnPreDraw { startPlaybackIfVideoPage() }
+        }
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+
+        playerHolder?.release()
+        playerHolder = null
+    }
+
+    private fun stopPlaybackIfPageChanged() {
+        val holder = playerHolder ?: return
+        val playingPath = holder.currentPath ?: return
+        if (playingPath != currentPath) {
+            restoreVideoPage(playingPath)
+            holder.detach()
+        }
+    }
+
+    /**
+     * Puts the page of [path] back to its thumbnail, see plan 12 3.3.
+     *
+     * Leaving this to MediaViewerAdapter.bindVideo() is not enough: with offscreenPageLimit = 1 the
+     * page next to the current one is never rebound, so it would stay black until it plays again.
+     */
+    private fun restoreVideoPage(path: Path) {
+        val position = paths.indexOf(path)
+        if (position == -1) {
+            return
+        }
+        val videoBinding = videoBindingAt(position) ?: return
+        videoBinding.playerView.isVisible = false
+        videoBinding.thumbnailImage.animate().cancel()
+        videoBinding.thumbnailImage.alpha = 1f
+        videoBinding.thumbnailImage.isVisible = true
+    }
+
+    private fun startPlaybackIfVideoPage() {
+        val path = currentPath
+        if (!path.isPlayableVideo) {
+            playerHolder?.detach()
+            return
+        }
+        val playerView = currentVideoBinding?.playerView ?: return
+        val holder = playerHolder ?: VideoPlayerHolder(requireContext(), playerListener)
+            .also { playerHolder = it }
+        // Already on this page: leave it alone, see plan 12 3.2.1.
+        if (holder.currentPath == path) {
+            return
+        }
+        playerView.isVisible = true
+        holder.play(path, playerView, 0L)
+    }
+
+    /** The binding of the current page, or null when it is not a bound video page. */
+    private val currentVideoBinding: MediaViewerVideoItemBinding?
+        get() = videoBindingAt(binding.viewPager.currentItem)
+
+    /**
+     * The binding of the video page at [position], or null when there is none right now.
+     *
+     * ViewPager2 hides its RecyclerView and offers no public way to reach a page, and a page that
+     * is off screen may have no view at all. Callers give up quietly when this returns null.
+     */
+    private fun videoBindingAt(position: Int): MediaViewerVideoItemBinding? {
+        val recyclerView = binding.viewPager.getChildAt(0) as? RecyclerView ?: return null
+        val holder = recyclerView.findViewHolderForAdapterPosition(position)
+        return (holder as? MediaViewerAdapter.VideoViewHolder)?.binding
+    }
+
+    private val playerListener = object : Player.Listener {
+        override fun onPlayerError(error: PlaybackException) {
+            error.printStackTrace()
+        }
+
+        override fun onRenderedFirstFrame() {
+            currentVideoBinding?.thumbnailImage?.fadeOutUnsafe()
         }
     }
 
