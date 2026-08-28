@@ -39,16 +39,20 @@ import kotlinx.parcelize.WriteWith
 import me.zhanghai.android.files.R
 import me.zhanghai.android.files.databinding.MediaViewerFragmentBinding
 import me.zhanghai.android.files.databinding.MediaViewerVideoItemBinding
+import me.zhanghai.android.files.file.MimeType
 import me.zhanghai.android.files.file.fileProviderUri
+import me.zhanghai.android.files.file.guessFromPath
 import me.zhanghai.android.files.provider.common.delete
 import me.zhanghai.android.files.ui.DepthPageTransformer
 import me.zhanghai.android.files.util.ParcelableArgs
 import me.zhanghai.android.files.util.ParcelableListParceler
 import me.zhanghai.android.files.util.ParcelableState
 import me.zhanghai.android.files.util.args
-import me.zhanghai.android.files.util.createSendImageIntent
+import me.zhanghai.android.files.util.createSendStreamIntent
+import me.zhanghai.android.files.util.createViewIntent
 import me.zhanghai.android.files.util.extraPath
 import me.zhanghai.android.files.util.extraPathList
+import me.zhanghai.android.files.util.fadeInUnsafe
 import me.zhanghai.android.files.util.fadeOutUnsafe
 import me.zhanghai.android.files.util.finish
 import me.zhanghai.android.files.util.getState
@@ -283,6 +287,12 @@ class MediaViewerFragment :
     private val playerListener = object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) {
             error.printStackTrace()
+            val path = playerHolder?.currentPath ?: return
+            // The page that failed may not be the page on screen any more, see plan 12 8.1.1.
+            if (path != currentPath) {
+                return
+            }
+            showPlaybackError(path, error)
         }
 
         override fun onRenderedFirstFrame() {
@@ -300,10 +310,6 @@ class MediaViewerFragment :
             }
         }
 
-        override fun onVideoSizeChanged(videoSize: VideoSize) {
-            updateVideoDetailsSheet()
-        }
-
         override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
             // PlayerControlView has a speed menu of its own, so the speed can change without
             // setPlaybackSpeed(). Keeping our copy in sync keeps the subtitle and the checked menu
@@ -313,6 +319,10 @@ class MediaViewerFragment :
                 updateTitle()
                 requireActivity().invalidateOptionsMenu()
             }
+        }
+
+        override fun onVideoSizeChanged(videoSize: VideoSize) {
+            updateVideoDetailsSheet()
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -393,6 +403,10 @@ class MediaViewerFragment :
     }
 
     override fun delete(path: Path) {
+        // Let go of the file before unlinking it, see spec 11 section 9.
+        playerHolder?.let { if (it.currentPath == path) it.detach() }
+        viewModel.playbackPositions.remove(path)
+        viewModel.videoFileDetails.remove(path)
         try {
             path.delete()
         } catch (e: IOException) {
@@ -414,7 +428,38 @@ class MediaViewerFragment :
         updateTitle()
         // Work around blank screen due to ViewPager2.PageTransformer not being called (and thus the
         // next item keeps its 0 alpha) when we have offscreenPageLimit = 1.
-        binding.viewPager.doOnPreDraw { binding.viewPager.requestTransform() }
+        binding.viewPager.doOnPreDraw {
+            binding.viewPager.requestTransform()
+            // The page that took the deleted one's place may be a video.
+            startPlaybackIfVideoPage()
+        }
+    }
+
+    private fun showPlaybackError(path: Path, error: PlaybackException) {
+        val videoBinding = currentVideoBinding ?: return
+        videoBinding.playerView.isVisible = false
+        videoBinding.thumbnailImage.isVisible = false
+        videoBinding.progress.fadeOutUnsafe()
+        videoBinding.errorText.text = getString(
+            R.string.media_viewer_playback_error_format, error.errorCodeName
+        )
+        // Another app cannot open a file that is missing or unreadable either, so the button is
+        // only for codec failures. Spec 11 section 8.
+        val isFileError = error.errorCode == PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND
+            || error.errorCode == PlaybackException.ERROR_CODE_IO_NO_PERMISSION
+        videoBinding.openWithButton.isVisible = !isFileError
+        videoBinding.openWithButton.setOnClickListener(
+            if (isFileError) null else View.OnClickListener { openWithAnotherApp(path) }
+        )
+        videoBinding.errorLayout.fadeInUnsafe(true)
+    }
+
+    private fun openWithAnotherApp(path: Path) {
+        val mimeType = MimeType.guessFromPath(path.toString())
+        val intent = path.fileProviderUri.createViewIntent(mimeType)
+            .apply { extraPath = path }
+            .withChooser()
+        startActivitySafe(intent)
     }
 
     override fun getVideoDetails(path: Path): VideoDetails {
@@ -501,7 +546,9 @@ class MediaViewerFragment :
 
     private fun share() {
         val path = currentPath
-        val intent = path.fileProviderUri.createSendImageIntent()
+        // Videos must not go out as image/*, see spec 11 section 9.
+        val mimeType = MimeType.guessFromPath(path.toString())
+        val intent = path.fileProviderUri.createSendStreamIntent(mimeType)
             .apply { extraPath = path }
             .withChooser()
         startActivitySafe(intent)

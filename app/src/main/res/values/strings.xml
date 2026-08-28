@@ -723,6 +723,7 @@
     <string name="media_viewer_details_location">Location</string>
     <string name="media_viewer_details_path">Path</string>
     <string name="media_viewer_details_unknown">\u2014</string>
+    <string name="media_viewer_playback_error_format">Cannot play this video (%1$s)</string>
     <string name="save_as_title">Save as</string>
     <string name="save_as_error">Error while saving file</string>
     <string name="save_as_success_format">“%1$s” has been saved to “%2$s”</string>

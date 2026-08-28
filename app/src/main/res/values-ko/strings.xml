@@ -567,6 +567,7 @@
     <string name="media_viewer_details_size">파일 크기</string>
     <string name="media_viewer_details_location">위치</string>
     <string name="media_viewer_details_path">경로</string>
+    <string name="media_viewer_playback_error_format">이 동영상을 재생할 수 없습니다 (%1$s)</string>
     <string name="save_as_title">다른 이름으로 저장</string>
     <string name="save_as_error">파일 저장 중 오류</string>
     <string name="save_as_success_format">“%1$s” 항목을 “%2$s”에 저장했습니다.</string>
