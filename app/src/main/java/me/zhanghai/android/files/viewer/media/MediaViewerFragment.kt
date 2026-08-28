@@ -24,11 +24,16 @@ import androidx.media3.common.C
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
+import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
 import dev.chrisbanes.insetter.applySystemWindowInsetsToPadding
 import java8.nio.file.Path
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.parcelize.Parcelize
 import kotlinx.parcelize.WriteWith
 import me.zhanghai.android.files.R
@@ -57,7 +62,8 @@ import me.zhanghai.android.systemuihelper.SystemUiHelper
 import java.io.IOException
 
 @OptIn(UnstableApi::class)
-class MediaViewerFragment : Fragment(), ConfirmDeleteDialogFragment.Listener {
+class MediaViewerFragment :
+    Fragment(), ConfirmDeleteDialogFragment.Listener, VideoDetailsDialogFragment.Listener {
     private val args by args<Args>()
 
     private val viewModel by viewModels { { MediaViewerViewModel() } }
@@ -142,7 +148,7 @@ class MediaViewerFragment : Fragment(), ConfirmDeleteDialogFragment.Listener {
                     // one would briefly play sound. See spec 11 section 5.1.
                     stopPlaybackIfPageChanged()
                     updatePlayerControlVisibility()
-                    // The playback speed item only exists on video pages.
+                    // The playback speed and details items only exist on video pages.
                     requireActivity().invalidateOptionsMenu()
                 }
 
@@ -284,10 +290,18 @@ class MediaViewerFragment : Fragment(), ConfirmDeleteDialogFragment.Listener {
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
+            if (playbackState == Player.STATE_READY) {
+                // videoFormat and duration are known only now, see spec 11 section 7.1.
+                updateVideoDetailsSheet()
+            }
             if (playbackState == Player.STATE_ENDED) {
                 // Otherwise coming back to this video would start it at its last frame.
                 playerHolder?.currentPath?.let { viewModel.playbackPositions.remove(it) }
             }
+        }
+
+        override fun onVideoSizeChanged(videoSize: VideoSize) {
+            updateVideoDetailsSheet()
         }
 
         override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
@@ -339,6 +353,7 @@ class MediaViewerFragment : Fragment(), ConfirmDeleteDialogFragment.Listener {
 
         val isVideo = currentPath.isPlayableVideo
         menu.findItem(R.id.action_playback_speed).isVisible = isVideo
+        menu.findItem(R.id.action_video_details).isVisible = isVideo
         if (isVideo) {
             // indexOf() is not available for FloatArray because of NaN.
             val index = PLAYBACK_SPEEDS.indexOfFirst { it == viewModel.playbackSpeed }
@@ -358,6 +373,10 @@ class MediaViewerFragment : Fragment(), ConfirmDeleteDialogFragment.Listener {
             R.id.action_speed_1 -> { setPlaybackSpeed(1f); true }
             R.id.action_speed_1_5 -> { setPlaybackSpeed(1.5f); true }
             R.id.action_speed_2 -> { setPlaybackSpeed(2f); true }
+            R.id.action_video_details -> {
+                showVideoDetails()
+                true
+            }
             R.id.action_delete -> {
                 confirmDelete()
                 true
@@ -396,6 +415,41 @@ class MediaViewerFragment : Fragment(), ConfirmDeleteDialogFragment.Listener {
         // Work around blank screen due to ViewPager2.PageTransformer not being called (and thus the
         // next item keeps its 0 alpha) when we have offscreenPageLimit = 1.
         binding.viewPager.doOnPreDraw { binding.viewPager.requestTransform() }
+    }
+
+    override fun getVideoDetails(path: Path): VideoDetails {
+        // The player only knows about the page it is attached to.
+        val player = playerHolder?.takeIf { it.currentPath == path }?.exoPlayer
+        return buildVideoDetails(
+            path, viewModel.videoFileDetails[path], player?.videoFormat, player?.duration
+        )
+    }
+
+    private fun showVideoDetails() {
+        val path = currentPath
+        VideoDetailsDialogFragment.show(path, this)
+        loadVideoFileDetails(path)
+    }
+
+    private fun loadVideoFileDetails(path: Path) {
+        if (path in viewModel.videoFileDetails) {
+            return
+        }
+        viewLifecycleOwner.lifecycleScope.launch {
+            val fileDetails = try {
+                withContext(Dispatchers.IO) { readVideoFileDetails(path) }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                return@launch
+            }
+            viewModel.videoFileDetails[path] = fileDetails
+            updateVideoDetailsSheet()
+        }
+    }
+
+    private fun updateVideoDetailsSheet() {
+        (childFragmentManager.findFragmentByTag(VideoDetailsDialogFragment.TAG)
+            as? VideoDetailsDialogFragment)?.updateDetails()
     }
 
     private fun setPlaybackSpeed(speed: Float) {

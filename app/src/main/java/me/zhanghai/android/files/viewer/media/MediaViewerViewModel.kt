@@ -18,4 +18,7 @@ class MediaViewerViewModel : ViewModel() {
 
     /** Shared by every video in this session, back to 1x when the viewer is closed. */
     var playbackSpeed = 1f
+
+    /** The file half of the details sheet, see plan 12 7.3. */
+    val videoFileDetails = mutableMapOf<Path, VideoFileDetails>()
 }
