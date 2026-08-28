@@ -20,6 +20,7 @@ import androidx.core.view.doOnPreDraw
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.interpolator.view.animation.FastOutSlowInInterpolator
+import androidx.media3.common.C
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
@@ -49,6 +50,7 @@ import me.zhanghai.android.files.util.mediumAnimTime
 import me.zhanghai.android.files.util.putState
 import me.zhanghai.android.files.util.showToast
 import me.zhanghai.android.files.util.startActivitySafe
+import me.zhanghai.android.files.util.viewModels
 import me.zhanghai.android.files.util.withChooser
 import me.zhanghai.android.systemuihelper.SystemUiHelper
 import java.io.IOException
@@ -56,6 +58,8 @@ import java.io.IOException
 @OptIn(UnstableApi::class)
 class MediaViewerFragment : Fragment(), ConfirmDeleteDialogFragment.Listener {
     private val args by args<Args>()
+
+    private val viewModel by viewModels { { MediaViewerViewModel() } }
     private val argsPaths by lazy { args.intent.extraPathList }
 
     private lateinit var paths: MutableList<Path>
@@ -151,6 +155,26 @@ class MediaViewerFragment : Fragment(), ConfirmDeleteDialogFragment.Listener {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+
+        // SCROLL_STATE_IDLE does not come again, and the page view may not be attached yet.
+        // See plan 12 5.3.
+        binding.viewPager.doOnPreDraw { startPlaybackIfVideoPage() }
+    }
+
+    override fun onPause() {
+        super.onPause()
+
+        // Holding on to a decoder in the background gets in the way of other apps, see spec 11
+        // section 5.3.
+        val holder = playerHolder ?: return
+        holder.currentPath?.let { rememberPosition(holder, it) }
+        holder.release()
+        playerHolder = null
+        binding.playerControlView.player = null
+    }
+
     override fun onDestroyView() {
         super.onDestroyView()
 
@@ -162,8 +186,16 @@ class MediaViewerFragment : Fragment(), ConfirmDeleteDialogFragment.Listener {
         val holder = playerHolder ?: return
         val playingPath = holder.currentPath ?: return
         if (playingPath != currentPath) {
+            rememberPosition(holder, playingPath)
             restoreVideoPage(playingPath)
             holder.detach()
+        }
+    }
+
+    private fun rememberPosition(holder: VideoPlayerHolder, path: Path) {
+        val position = holder.currentPositionMillis
+        if (position != C.TIME_UNSET && position > 0) {
+            viewModel.playbackPositions[path] = position
         }
     }
 
@@ -204,7 +236,7 @@ class MediaViewerFragment : Fragment(), ConfirmDeleteDialogFragment.Listener {
             return
         }
         playerView.isVisible = true
-        holder.play(path, playerView, 0L)
+        holder.play(path, playerView, viewModel.playbackPositions[path] ?: 0L)
     }
 
     /** Photo pages never show the controls, see spec 11 section 6.2. */
@@ -244,6 +276,18 @@ class MediaViewerFragment : Fragment(), ConfirmDeleteDialogFragment.Listener {
 
         override fun onRenderedFirstFrame() {
             currentVideoBinding?.thumbnailImage?.fadeOutUnsafe()
+        }
+
+        override fun onPlaybackStateChanged(playbackState: Int) {
+            if (playbackState == Player.STATE_ENDED) {
+                // Otherwise coming back to this video would start it at its last frame.
+                playerHolder?.currentPath?.let { viewModel.playbackPositions.remove(it) }
+            }
+        }
+
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            // A view flag instead of a window flag: it is cleared when the view leaves the window.
+            binding.root.keepScreenOn = isPlaying
         }
     }
 
