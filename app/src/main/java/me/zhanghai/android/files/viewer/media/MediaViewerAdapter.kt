@@ -6,6 +6,7 @@
 package me.zhanghai.android.files.viewer.media
 
 import android.graphics.BitmapFactory
+import androidx.exifinterface.media.ExifInterface
 import android.view.View
 import android.view.ViewGroup
 import androidx.core.view.isVisible
@@ -174,9 +175,17 @@ class MediaViewerAdapter(
         val mimeType = AndroidFileTypeDetector.getMimeType(this, attributes).asMimeType()
         val bitmapOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         newInputStream().use { BitmapFactory.decodeStream(it, null, bitmapOptions) }
+        // SubsamplingScaleImageView cannot find the EXIF of our content:// uri for every format —
+        // HEIC comes out sideways — so we read it here and tell it the angle. See doc 13 section 8.
+        val rotationDegrees = try {
+            newInputStream().use { ExifInterface(it).rotationDegrees }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            0
+        }
         return ImageInfo(
             attributes, bitmapOptions.outWidth, bitmapOptions.outHeight,
-            bitmapOptions.outMimeType?.asMimeTypeOrNull() ?: mimeType
+            bitmapOptions.outMimeType?.asMimeTypeOrNull() ?: mimeType, rotationDegrees
         )
     }
 
@@ -200,7 +209,7 @@ class MediaViewerAdapter(
         } else {
             binding.largeImage.apply {
                 setDoubleTapZoomDuration(300)
-                orientation = SubsamplingScaleImageView.ORIENTATION_USE_EXIF
+                orientation = imageInfo.rotationDegrees
                 // Otherwise OnImageEventListener.onReady() is never called.
                 isVisible = true
                 alpha = 0f
@@ -231,7 +240,7 @@ class MediaViewerAdapter(
                 return false
             }
             // 4 bytes per pixel for ARGB_8888.
-            if (width * height * 4 > MAX_BITMAP_SIZE) {
+            if (width * height * 4 > LARGE_IMAGE_BITMAP_SIZE) {
                 return true
             }
             if (width > 2048 || height > 2048) {
@@ -267,8 +276,16 @@ class MediaViewerAdapter(
         private const val VIEW_TYPE_IMAGE = 0
         private const val VIEW_TYPE_VIDEO = 1
 
-        // @see android.graphics.RecordingCanvas#MAX_BITMAP_SIZE
-        private const val MAX_BITMAP_SIZE = 100 * 1024 * 1024
+        /**
+         * Above this a photo goes to the tiled view instead of becoming one whole bitmap.
+         *
+         * The hard limit is 100 MB (@see android.graphics.RecordingCanvas#MAX_BITMAP_SIZE), but
+         * that is what a Canvas can draw at all, not what a page can draw smoothly. Three pages
+         * are alive at once (offscreenPageLimit = 1) and every swipe re-uploads them, so a 12 MP
+         * phone photo — 48 MB as ARGB_8888, well under the hard limit — already makes the swipe
+         * animation stutter and starves video playback on the same render thread.
+         */
+        private const val LARGE_IMAGE_BITMAP_SIZE = 24 * 1024 * 1024
 
         // PhotoView measures its scale against the fitted image, so 1 is "not zoomed".
         private const val PHOTO_VIEW_MIN_SCALE = 1f
@@ -289,6 +306,8 @@ class MediaViewerAdapter(
         val attributes: BasicFileAttributes,
         val width: Int,
         val height: Int,
-        val mimeType: MimeType
+        val mimeType: MimeType,
+        /** 0, 90, 180 or 270 — what SubsamplingScaleImageView.setOrientation() takes. */
+        val rotationDegrees: Int
     )
 }

@@ -26,6 +26,8 @@ import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.ui.DefaultTimeBar
+import androidx.media3.ui.TimeBar
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
@@ -88,6 +90,9 @@ class MediaViewerFragment :
     /** Wrapping twice would stack disc on disc, see spec 11a section 3.3. */
     private var isOverflowIconScrimmed = false
 
+    /** A finger on the slider keeps the player buffering, see spec 11a section 6.1. */
+    private var isScrubbing = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -131,6 +136,22 @@ class MediaViewerFragment :
         binding.playerControlView.applySystemWindowInsetsToPadding(
             left = true, bottom = true, right = true
         )
+        // Dragging the slider makes the player buffer for as long as the finger is down, which
+        // would put a spinner in the middle of the picture. See spec 11a section 6.1.
+        binding.playerControlView
+            .findViewById<DefaultTimeBar>(androidx.media3.ui.R.id.exo_progress)
+            ?.addListener(object : TimeBar.OnScrubListener {
+                override fun onScrubStart(timeBar: TimeBar, position: Long) {
+                    isScrubbing = true
+                    currentVideoHolder?.progress?.end(DelayedProgress.Reason.BUFFERING)
+                }
+
+                override fun onScrubMove(timeBar: TimeBar, position: Long) {}
+
+                override fun onScrubStop(timeBar: TimeBar, position: Long, canceled: Boolean) {
+                    isScrubbing = false
+                }
+            })
         systemUiHelper = SystemUiHelper(
             activity, SystemUiHelper.LEVEL_IMMERSIVE, SystemUiHelper.FLAG_IMMERSIVE_STICKY
         ) { visible: Boolean ->
@@ -358,7 +379,7 @@ class MediaViewerFragment :
             return
         }
         val holder = currentVideoHolder ?: return
-        if (playbackState == Player.STATE_BUFFERING) {
+        if (playbackState == Player.STATE_BUFFERING && !isScrubbing) {
             holder.progress.begin(DelayedProgress.Reason.BUFFERING)
         } else {
             holder.progress.end(DelayedProgress.Reason.BUFFERING)

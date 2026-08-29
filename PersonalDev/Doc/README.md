@@ -34,6 +34,7 @@ Windows 11에서 실제로 겪고 검증한 내용만 정리했다.
 | [11-video-viewer-spec.md](11-video-viewer-spec.md) | 동영상 뷰어 기획서 — 앱 안에서 재생, 슬라이더·속도 조절·세부 정보 |
 | [11a-viewer-ui-cleanup-spec.md](11a-viewer-ui-cleanup-spec.md) | 뷰어 화면 정리 기획서 — 상·하단 검정 판 제거, 요소별 스크림, 슬라이더 판정 확대 |
 | [12-video-viewer-plan.md](12-video-viewer-plan.md) | 동영상 뷰어 구현 계획 (0~10단계) |
+| [13-viewer-performance.md](13-viewer-performance.md) | 뷰어가 느려지는 원인 조사와 수정 — 원본 해상도 비트맵, 스와이프 끊김, 계측 함정 |
 | [media-view-mode-open-items.md](media-view-mode-open-items.md) | 09번 계획서의 미결 항목 — 누락·미결정·문서 모순 (착수 전 확인) |
 
 ## 핵심 요약 (급할 때 여기만)
