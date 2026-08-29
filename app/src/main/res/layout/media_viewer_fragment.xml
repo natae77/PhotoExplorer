@@ -23,7 +23,9 @@
         android:layout_gravity="bottom"
         android:visibility="gone"
         app:controller_layout_id="@layout/media_viewer_player_control"
-        app:show_timeout="0" />
+        app:show_timeout="0"
+        app:play_icon="@drawable/exo_icon_play"
+        app:pause_icon="@drawable/exo_icon_pause" />
 
     <FrameLayout
         android:id="@+id/appBarLayout"

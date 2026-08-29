@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+  ~ Copyright (c) 2026 PhotoExplorer
+  ~ All Rights Reserved.
+  -->
+
+<!--
+  ~ The press highlight for a control button. It lives on the wrapper that draws the disc, not on
+  ~ the button, so it is a circle of exactly the disc's size. See doc 13 section 5.
+  -->
+<ripple
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="?attr/colorControlHighlight">
+
+    <item android:id="@android:id/mask">
+        <shape android:shape="oval">
+            <solid android:color="@android:color/white" />
+        </shape>
+    </item>
+</ripple>

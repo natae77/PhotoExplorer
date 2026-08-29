@@ -28,50 +28,73 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="13dp"
         android:orientation="horizontal">
 
         <FrameLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
             android:layout_marginStart="8dp"
             android:layout_marginEnd="8dp"
-            android:background="@drawable/media_viewer_scrim_circle">
+            android:background="@drawable/media_viewer_scrim_circle"
+            android:foreground="@drawable/media_viewer_control_ripple"
+            android:addStatesFromChildren="true">
 
             <!-- singleLine override needed to avoid layout bugs, as in Media3's own include. -->
             <Button
                 android:id="@id/exo_rew_with_amount"
                 style="@style/ExoStyledControls.Button.Center.RewWithAmount"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_gravity="center"
                 android:layout_marginLeft="0dp"
                 android:layout_marginRight="0dp"
+                android:foreground="@null"
+                android:paddingBottom="11dp"
+                android:textSize="6dp"
                 android:singleLine="false" />
         </FrameLayout>
 
         <FrameLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
             android:layout_marginStart="8dp"
             android:layout_marginEnd="8dp"
-            android:background="@drawable/media_viewer_scrim_circle">
+            android:background="@drawable/media_viewer_scrim_circle"
+            android:foreground="@drawable/media_viewer_control_ripple"
+            android:addStatesFromChildren="true">
 
             <ImageButton
                 android:id="@id/exo_play_pause"
                 style="@style/ExoStyledControls.Button.Center.PlayPause"
+                android:background="@null"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_gravity="center"
                 android:layout_marginLeft="0dp"
                 android:layout_marginRight="0dp" />
         </FrameLayout>
 
         <FrameLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
             android:layout_marginStart="8dp"
             android:layout_marginEnd="8dp"
-            android:background="@drawable/media_viewer_scrim_circle">
+            android:background="@drawable/media_viewer_scrim_circle"
+            android:foreground="@drawable/media_viewer_control_ripple"
+            android:addStatesFromChildren="true">
 
             <Button
                 android:id="@id/exo_ffwd_with_amount"
                 style="@style/ExoStyledControls.Button.Center.FfwdWithAmount"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_gravity="center"
                 android:layout_marginLeft="0dp"
                 android:layout_marginRight="0dp"
+                android:foreground="@null"
+                android:paddingBottom="11dp"
+                android:textSize="6dp"
                 android:singleLine="false" />
         </FrameLayout>
     </LinearLayout>
