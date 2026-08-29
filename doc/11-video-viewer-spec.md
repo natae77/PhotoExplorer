@@ -33,7 +33,7 @@
 ## 1. 배경
 
 파일 목록에서 동영상을 누르면 암시적 VIEW 인텐트가 나가서 **다른 앱**이 뜬다
-([FileListFragment.kt:1365](../../app/src/main/java/me/zhanghai/android/files/filelist/FileListFragment.kt#L1365) `openFileWithIntent()`).
+([FileListFragment.kt:1365](../app/src/main/java/me/zhanghai/android/files/filelist/FileListFragment.kt#L1365) `openFileWithIntent()`).
 사진은 그렇지 않다 — `ImageViewerActivity`가 앱 안에서 처리한다.
 
 그래서 사진 20장과 동영상 3개가 섞인 폴더를 훑을 때 흐름이 이렇게 끊긴다.
@@ -47,7 +47,7 @@
 08번에서 만든 미디어 보기 모드는 사진과 동영상을 **한 격자에** 촬영 순서대로 늘어놓는다.
 격자에서는 한 덩어리인데 뷰어에서는 갈라지는 셈이다.
 
-재생 라이브러리는 아직 없다. `coil-video`([app/build.gradle:197](../../app/build.gradle#L197))가 있지만
+재생 라이브러리는 아직 없다. `coil-video`([app/build.gradle:197](../app/build.gradle#L197))가 있지만
 이건 썸네일용 프레임 추출이지 재생기가 아니다.
 
 ## 2. 목표 / 비목표
@@ -78,11 +78,11 @@
 
 | # | 조건 | 판정 |
 |---|---|---|
-| 1 | MIME 타입이 동영상 | `mimeType.isVideo` ([MimeTypeTypeExtensions.kt:49](../../app/src/main/java/me/zhanghai/android/files/file/MimeTypeTypeExtensions.kt#L49)) |
+| 1 | MIME 타입이 동영상 | `mimeType.isVideo` ([MimeTypeTypeExtensions.kt:49](../app/src/main/java/me/zhanghai/android/files/file/MimeTypeTypeExtensions.kt#L49)) |
 | 2 | 로컬 파일 또는 SAF 문서 경로 | `path.isLinuxPath` 또는 `path.isDocumentPath` |
 
 `.mov`는 `video/quicktime`, `.mp4`는 `video/mp4`로 이미 매핑돼 있다
-([MimeTypeMapCompat.kt:771](../../app/src/main/java/me/zhanghai/android/files/compat/MimeTypeMapCompat.kt#L771), [779](../../app/src/main/java/me/zhanghai/android/files/compat/MimeTypeMapCompat.kt#L779)).
+([MimeTypeMapCompat.kt:771](../app/src/main/java/me/zhanghai/android/files/compat/MimeTypeMapCompat.kt#L771), [779](../app/src/main/java/me/zhanghai/android/files/compat/MimeTypeMapCompat.kt#L779)).
 `.mkv`, `.webm`, `.3gp` 등 다른 동영상도 조건에 맞으면 똑같이 재생 대상이다 —
 "폰으로 찍은 것"이 계기일 뿐, MIME 타입으로 판정하지 확장자를 골라내지 않는다.
 
@@ -109,7 +109,7 @@
 
 ### 4.2 뷰어 목록에 무엇이 들어가는가
 
-지금 [FileListFragment.kt:1393](../../app/src/main/java/me/zhanghai/android/files/filelist/FileListFragment.kt#L1393)
+지금 [FileListFragment.kt:1393](../app/src/main/java/me/zhanghai/android/files/filelist/FileListFragment.kt#L1393)
 `maybeAddImageViewerActivityExtras()`는 어댑터를 훑으면서 `isImage`인 파일만 담는다.
 여기에 **§3의 재생 가능한 동영상**을 더한다.
 
@@ -127,7 +127,7 @@
 
 ### 4.3 페이지 레이아웃
 
-한 페이지 레이아웃([image_viewer_item.xml](../../app/src/main/res/layout/image_viewer_item.xml))에는
+한 페이지 레이아웃([image_viewer_item.xml](../app/src/main/res/layout/image_viewer_item.xml))에는
 지금 `PhotoView`와 `SubsamplingScaleImageView`가 겹쳐 있고 이미지 크기에 따라 하나만 보인다.
 **동영상 페이지는 별도 레이아웃**으로 분리한다 — 재생용 뷰는 이미지 로딩 경로를 전혀 타지 않고,
 같은 레이아웃에 세 번째 뷰를 겹쳐 두면 어느 것이 보이는지 따지는 분기가 늘기만 한다.
@@ -148,7 +148,7 @@
 
 **재생기 인스턴스는 뷰어 전체에서 하나만 둔다.** 페이지마다 만들지 않는다.
 
-`ViewPager2`의 `offscreenPageLimit = 1`([ImageViewerFragment.kt:112](../../app/src/main/java/me/zhanghai/android/files/viewer/image/ImageViewerFragment.kt#L112))이라
+`ViewPager2`의 `offscreenPageLimit = 1`([ImageViewerFragment.kt:112](../app/src/main/java/me/zhanghai/android/files/viewer/image/ImageViewerFragment.kt#L112))이라
 앞뒤 페이지까지 최대 세 개가 살아있다. 하드웨어 디코더는 기기마다 몇 개뿐이라
 인스턴스를 페이지 수만큼 만들면 금방 바닥나고, 그때부터 재생이 조용히 실패한다.
 
@@ -220,7 +220,7 @@
 화면을 탭하면 **앱 바와 재생 컨트롤이 같이 나타나고 같이 사라진다.**
 
 지금 뷰어는 탭하면 몰입 모드가 토글되면서 앱 바가 오르내린다
-([ImageViewerFragment.kt:92](../../app/src/main/java/me/zhanghai/android/files/viewer/image/ImageViewerFragment.kt#L92)).
+([ImageViewerFragment.kt:92](../app/src/main/java/me/zhanghai/android/files/viewer/image/ImageViewerFragment.kt#L92)).
 재생 컨트롤이 자기만의 자동 숨김 타이머로 따로 놀면 "앱 바는 사라졌는데 컨트롤은 남아있는"
 어정쩡한 상태가 생긴다. 컨트롤의 **자동 숨김은 끄고**, 앱 바를 여닫는 곳에 묶는다.
 
@@ -280,12 +280,12 @@
 |---|---|---|
 | 해상도 · 코덱 · 프레임 레이트 · 회전 · 비트레이트 | **재생기가 들고 있는 포맷 정보** | 이미 디코딩 중이므로 **공짜이고 정확하다.** 같은 값을 `MediaMetadataRetriever`로 다시 읽으면 파일을 한 번 더 여는 셈이고, 코덱·fps는 아예 제공하지 않는다 |
 | 길이 | 재생기 | 위와 같다 |
-| **촬영 시각** | **`MediaCreatedTime.read()`** ([MediaCreatedTime.kt](../../app/src/main/java/me/zhanghai/android/files/file/MediaCreatedTime.kt)) | 08번 §5의 `min(메타데이터, 수정시각)` 규칙을 **그대로** 쓴다. 목록의 날짜 타일과 뷰어의 촬영 시각이 어긋나면 안 된다 |
-| 위치 | `MediaMetadataRetriever` | 재생기가 주지 않는다. 기존 [VideoInfoLiveData.kt](../../app/src/main/java/me/zhanghai/android/files/fileproperties/video/VideoInfoLiveData.kt)의 `retriever.location`과 같은 경로 |
+| **촬영 시각** | **`MediaCreatedTime.read()`** ([MediaCreatedTime.kt](../app/src/main/java/me/zhanghai/android/files/file/MediaCreatedTime.kt)) | 08번 §5의 `min(메타데이터, 수정시각)` 규칙을 **그대로** 쓴다. 목록의 날짜 타일과 뷰어의 촬영 시각이 어긋나면 안 된다 |
+| 위치 | `MediaMetadataRetriever` | 재생기가 주지 않는다. 기존 [VideoInfoLiveData.kt](../app/src/main/java/me/zhanghai/android/files/fileproperties/video/VideoInfoLiveData.kt)의 `retriever.location`과 같은 경로 |
 | 파일 크기 · 경로 | 파일 속성 | — |
 
 기존 속성 대화상자의 "동영상" 탭
-([FilePropertiesVideoTabFragment.kt](../../app/src/main/java/me/zhanghai/android/files/fileproperties/video/FilePropertiesVideoTabFragment.kt))은
+([FilePropertiesVideoTabFragment.kt](../app/src/main/java/me/zhanghai/android/files/fileproperties/video/FilePropertiesVideoTabFragment.kt))은
 **그대로 둔다.** 파일 목록에서 여는 경로는 바뀌지 않는다.
 
 ## 8. 재생할 수 없을 때
@@ -304,11 +304,11 @@ HDR10·HDR10+·Dolby Vision도 흔하다. 기기에 디코더가 없거나 파�
 ## 9. 기존 동작 중 손보는 것
 
 **공유의 MIME 타입.** 지금 뷰어의 공유는 `createSendImageIntent()`를 써서
-타입이 `image/*`로 **고정**돼 있다([IntentExtensions.kt:126](../../app/src/main/java/me/zhanghai/android/files/util/IntentExtensions.kt#L126),
-[ImageViewerFragment.kt:204](../../app/src/main/java/me/zhanghai/android/files/viewer/image/ImageViewerFragment.kt#L204)).
+타입이 `image/*`로 **고정**돼 있다([IntentExtensions.kt:126](../app/src/main/java/me/zhanghai/android/files/util/IntentExtensions.kt#L126),
+[ImageViewerFragment.kt:204](../app/src/main/java/me/zhanghai/android/files/viewer/image/ImageViewerFragment.kt#L204)).
 동영상을 이대로 공유하면 받는 앱이 사진인 줄 알고 잘못 처리한다.
 **그 파일의 실제 MIME 타입**을 쓰도록 고친다 — 범용 `createSendStreamIntent(mimeType)`이
-바로 아래([:138](../../app/src/main/java/me/zhanghai/android/files/util/IntentExtensions.kt#L138))에 이미 있다.
+바로 아래([:138](../app/src/main/java/me/zhanghai/android/files/util/IntentExtensions.kt#L138))에 이미 있다.
 
 **삭제.** 동영상에서도 그대로 동작해야 한다. 삭제한 페이지를 목록에서 빼고 다음 항목으로
 넘어가는 기존 처리를 따르되, **삭제되는 것이 지금 재생 중인 동영상이면 먼저 재생을 멈추고
@@ -380,17 +380,17 @@ HDR10·HDR10+·Dolby Vision도 흔하다. 기기에 디코더가 없거나 파�
 
 | 파일 | 무엇이 걸리나 |
 |---|---|
-| [FileListFragment.kt:1393](../../app/src/main/java/me/zhanghai/android/files/filelist/FileListFragment.kt#L1393) | 뷰어 목록에 재생 가능한 동영상을 추가 (§4.2) |
-| [ImageViewerActivity.kt](../../app/src/main/java/me/zhanghai/android/files/viewer/image/ImageViewerActivity.kt) | 이름 변경 (§4.1) |
-| [ImageViewerFragment.kt](../../app/src/main/java/me/zhanghai/android/files/viewer/image/ImageViewerFragment.kt) | 플레이어 소유·수명, 페이지 전환 처리, 메뉴 확장, 공유 MIME (§5·§6·§9) |
-| [ImageViewerAdapter.kt](../../app/src/main/java/me/zhanghai/android/files/viewer/image/ImageViewerAdapter.kt) | 페이지 종류 분기, 동영상 페이지 바인딩 (§4.3) |
-| [image_viewer_item.xml](../../app/src/main/res/layout/image_viewer_item.xml) | 동영상 페이지는 별도 레이아웃으로 (§4.3) |
-| [image_viewer.xml (menu)](../../app/src/main/res/menu/image_viewer.xml) | "재생 속도", "세부 정보" 추가 (§6.3·§7) |
-| [IntentExtensions.kt:126](../../app/src/main/java/me/zhanghai/android/files/util/IntentExtensions.kt#L126) | 공유 MIME 고정 문제 (§9) |
-| [MediaCreatedTime.kt](../../app/src/main/java/me/zhanghai/android/files/file/MediaCreatedTime.kt) | 촬영 시각을 그대로 재사용. **수정하지 않는다** (§7.2) |
-| [AndroidManifest.xml:339](../../app/src/main/AndroidManifest.xml#L339) | 액티비티 이름 변경. 인텐트 필터는 그대로 (§4.1) |
+| [FileListFragment.kt:1393](../app/src/main/java/me/zhanghai/android/files/filelist/FileListFragment.kt#L1393) | 뷰어 목록에 재생 가능한 동영상을 추가 (§4.2) |
+| [ImageViewerActivity.kt](../app/src/main/java/me/zhanghai/android/files/viewer/image/ImageViewerActivity.kt) | 이름 변경 (§4.1) |
+| [ImageViewerFragment.kt](../app/src/main/java/me/zhanghai/android/files/viewer/image/ImageViewerFragment.kt) | 플레이어 소유·수명, 페이지 전환 처리, 메뉴 확장, 공유 MIME (§5·§6·§9) |
+| [ImageViewerAdapter.kt](../app/src/main/java/me/zhanghai/android/files/viewer/image/ImageViewerAdapter.kt) | 페이지 종류 분기, 동영상 페이지 바인딩 (§4.3) |
+| [image_viewer_item.xml](../app/src/main/res/layout/image_viewer_item.xml) | 동영상 페이지는 별도 레이아웃으로 (§4.3) |
+| [image_viewer.xml (menu)](../app/src/main/res/menu/image_viewer.xml) | "재생 속도", "세부 정보" 추가 (§6.3·§7) |
+| [IntentExtensions.kt:126](../app/src/main/java/me/zhanghai/android/files/util/IntentExtensions.kt#L126) | 공유 MIME 고정 문제 (§9) |
+| [MediaCreatedTime.kt](../app/src/main/java/me/zhanghai/android/files/file/MediaCreatedTime.kt) | 촬영 시각을 그대로 재사용. **수정하지 않는다** (§7.2) |
+| [AndroidManifest.xml:339](../app/src/main/AndroidManifest.xml#L339) | 액티비티 이름 변경. 인텐트 필터는 그대로 (§4.1) |
 | `res/values/strings.xml`, `res/values-ko/strings.xml` | 뷰어 제목 변경, 새 문자열 추가 (§10) |
-| [app/build.gradle](../../app/build.gradle) | 재생 라이브러리 추가 |
+| [app/build.gradle](../app/build.gradle) | 재생 라이브러리 추가 |
 
 ## 부록. 확정된 결정 기록
 

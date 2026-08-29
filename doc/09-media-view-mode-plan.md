@@ -154,7 +154,7 @@ fun readMediaCreatedTime(path, attributes, mimeType): Long?
 - 압축 파일 내부 경로(`isArchivePath`) → null
 - null이면 호출부에서 mtime을 쓴다
 
-> `supportsThumbnail`([FileItemExtensions.kt:59](../../app/src/main/java/me/zhanghai/android/files/filelist/FileItemExtensions.kt#L59))이
+> `supportsThumbnail`([FileItemExtensions.kt:59](../app/src/main/java/me/zhanghai/android/files/filelist/FileItemExtensions.kt#L59))이
 > 이미 비슷한 판정을 하고 있으므로, 조건 로직을 참고하거나 일부 재사용한다.
 
 ### 1.3 캐시 — **메모리 LRU만, 디스크는 나중에**
@@ -223,7 +223,7 @@ cache.put(key, result ?: NO_VALUE)                            // 기록
 
 ### 2.1 `FileItem`에 필드 추가
 
-**파일**: [`file/FileItem.kt`](../../app/src/main/java/me/zhanghai/android/files/file/FileItem.kt)
+**파일**: [`file/FileItem.kt`](../app/src/main/java/me/zhanghai/android/files/file/FileItem.kt)
 
 ```kotlin
 @Parcelize
@@ -240,7 +240,7 @@ data class FileItem(
 
 ### 2.2 정렬 기준 추가
 
-**파일**: [`filelist/FileSortOptions.kt`](../../app/src/main/java/me/zhanghai/android/files/filelist/FileSortOptions.kt)
+**파일**: [`filelist/FileSortOptions.kt`](../app/src/main/java/me/zhanghai/android/files/filelist/FileSortOptions.kt)
 
 ```kotlin
 enum class By { NAME, TYPE, SIZE, LAST_MODIFIED, MEDIA_CREATED }   // ← 맨 뒤에 추가
@@ -262,7 +262,7 @@ By.MEDIA_CREATED ->
 
 ### 2.3 메뉴 · 문자열
 
-**파일**: [`res/menu/file_list.xml`](../../app/src/main/res/menu/file_list.xml) — `group_sort`에 항목 추가
+**파일**: [`res/menu/file_list.xml`](../app/src/main/res/menu/file_list.xml) — `group_sort`에 항목 추가
 
 ```xml
 <item android:id="@+id/action_sort_by_media_created"
@@ -270,7 +270,7 @@ By.MEDIA_CREATED ->
 ```
 
 **파일**: `FileListFragment.kt`
-- `MenuBinding`에 `sortByMediaCreatedItem` 추가 (클래스 [1705행](../../app/src/main/java/me/zhanghai/android/files/filelist/FileListFragment.kt#L1705))
+- `MenuBinding`에 `sortByMediaCreatedItem` 추가 (클래스 [1705행](../app/src/main/java/me/zhanghai/android/files/filelist/FileListFragment.kt#L1705))
 - `onOptionsItemSelected`에 분기 추가
 - `updateViewSortMenuItems()`의 `when(sortOptions.by)`에 분기 추가
 
@@ -291,14 +291,14 @@ By.MEDIA_CREATED ->
 
 ### 3.1 enum 추가
 
-**파일**: [`filelist/FileViewType.kt`](../../app/src/main/java/me/zhanghai/android/files/filelist/FileViewType.kt)
+**파일**: [`filelist/FileViewType.kt`](../app/src/main/java/me/zhanghai/android/files/filelist/FileViewType.kt)
 
 ```kotlin
 enum class FileViewType { LIST, GRID, MEDIA }    // ← MEDIA 맨 뒤
 ```
 
 ⚠️ **반드시 맨 뒤.** SharedPreferences에 **ordinal(정수)** 로 저장된다
-([SettingLiveDatas.kt:239](../../app/src/main/java/me/zhanghai/android/files/settings/SettingLiveDatas.kt#L239)).
+([SettingLiveDatas.kt:239](../app/src/main/java/me/zhanghai/android/files/settings/SettingLiveDatas.kt#L239)).
 
 `FileListAdapter.getItemViewType()`이 `viewType.ordinal`을 쓰고
 `onCreateViewHolder`가 `FileViewType.entries[viewType]`로 되돌리므로, 추가만 하면 자동으로 이어진다.
@@ -307,7 +307,7 @@ enum class FileViewType { LIST, GRID, MEDIA }    // ← MEDIA 맨 뒤
 
 **파일**: `res/layout/file_item_media.xml`
 
-기존 [`file_item_grid.xml`](../../app/src/main/res/layout/file_item_grid.xml)을 참고하되 다음이 다르다:
+기존 [`file_item_grid.xml`](../app/src/main/res/layout/file_item_grid.xml)을 참고하되 다음이 다르다:
 
 | 항목 | grid | media |
 |---|---|---|
@@ -344,7 +344,7 @@ enum class FileViewType { LIST, GRID, MEDIA }    // ← MEDIA 맨 뒤
 
 ### 3.3 표시 대상 필터
 
-**파일**: `FileListFragment.updateAdapterFileList()` ([734행](../../app/src/main/java/me/zhanghai/android/files/filelist/FileListFragment.kt#L734))
+**파일**: `FileListFragment.updateAdapterFileList()` ([734행](../app/src/main/java/me/zhanghai/android/files/filelist/FileListFragment.kt#L734))
 
 숨김 파일 필터 **바로 옆**에 붙인다. 자연스러운 자리다.
 
@@ -362,7 +362,7 @@ if (viewModel.viewType == FileViewType.MEDIA) {
 
 ### 3.4 어댑터 바인딩
 
-**파일**: [`filelist/FileListAdapter.kt`](../../app/src/main/java/me/zhanghai/android/files/filelist/FileListAdapter.kt)
+**파일**: [`filelist/FileListAdapter.kt`](../app/src/main/java/me/zhanghai/android/files/filelist/FileListAdapter.kt)
 
 - `onCreateViewHolder`: `FileViewType.MEDIA` 분기 추가.
   grid 전용 Material3 배경/전경 처리는 **적용하지 않는다**(라운드 없음).
@@ -376,7 +376,7 @@ if (viewModel.viewType == FileViewType.MEDIA) {
 
 ### 3.5 열 수
 
-**파일**: `FileListFragment.updateSpanCount()` ([656행](../../app/src/main/java/me/zhanghai/android/files/filelist/FileListFragment.kt#L656))
+**파일**: `FileListFragment.updateSpanCount()` ([656행](../app/src/main/java/me/zhanghai/android/files/filelist/FileListFragment.kt#L656))
 
 ```kotlin
 FileViewType.MEDIA -> (widthDp / 112).coerceAtLeast(1)
@@ -444,7 +444,7 @@ sealed interface FileListItem {
 열기·선택·메뉴·정렬 어디 한 군데에서 분기를 빠뜨리면 크래시다.
 타입을 나누면 컴파일러가 빠뜨린 곳을 잡아 준다.
 
-**파일**: [`filelist/FileListAdapter.kt`](../../app/src/main/java/me/zhanghai/android/files/filelist/FileListAdapter.kt)
+**파일**: [`filelist/FileListAdapter.kt`](../app/src/main/java/me/zhanghai/android/files/filelist/FileListAdapter.kt)
 
 제네릭 타입을 바꾼다. 뷰홀더도 두 종류가 되므로 상위 타입으로 올린다.
 
@@ -526,7 +526,7 @@ private fun rebuildItems(clear: Boolean) {
 | `getItemViewType()` (172행) | 날짜면 별도 값. 지금은 `viewType.ordinal`을 그대로 쓰고 `onCreateViewHolder`가 `FileViewType.entries[viewType]`로 되돌리므로, 날짜용 상수를 `FileViewType.entries.size`(=3)로 잡는다 | `onCreateViewHolder`에서 배열 범위 초과 |
 | `onBindViewHolder(payloads)` (206행) | 날짜 뷰홀더면 바로 반환 | `pickOptions`·`nameEllipsize`가 바뀔 때 전체 재바인딩이 돌면서 크래시 |
 | `getPopupText()` (395행) | 날짜면 그 날짜 문자열 | 빠른 스크롤 팝업에서 크래시. *팝업에 날짜를 띄우는 기능을 만드는 게 아니라, 반환할 값이 있어야 해서다* |
-| **`FileListFragment.maybeAddImageViewerActivityExtras()`** ([1294행](../../app/src/main/java/me/zhanghai/android/files/filelist/FileListFragment.kt#L1294)) | 어댑터를 훑어 이미지 경로를 모은다. 날짜 항목 건너뛰기 | **사진을 열 때 크래시.** 어댑터 밖에 있어서 놓치기 쉽다 |
+| **`FileListFragment.maybeAddImageViewerActivityExtras()`** ([1294행](../app/src/main/java/me/zhanghai/android/files/filelist/FileListFragment.kt#L1294)) | 어댑터를 훑어 이미지 경로를 모은다. 날짜 항목 건너뛰기 | **사진을 열 때 크래시.** 어댑터 밖에 있어서 놓치기 쉽다 |
 
 **§4.1 검증**: 여기까지 하고 앱을 돌렸을 때 **아무것도 달라지지 않아야 한다.**
 목록·바둑판 모드, 선택, 정렬 변경, 검색, 사진 열기가 전부 이전과 똑같으면 통과다.
@@ -634,7 +634,7 @@ AspectRatioFrameLayout (app:aspectRatio="1.0", background=?colorSurfaceVariant)
 
 ## 5단계. 최신 항목으로 스크롤
 
-**파일**: `FileListFragment.onFileListChanged()` ([589행](../../app/src/main/java/me/zhanghai/android/files/filelist/FileListFragment.kt#L589))
+**파일**: `FileListFragment.onFileListChanged()` ([589행](../app/src/main/java/me/zhanghai/android/files/filelist/FileListFragment.kt#L589))
 
 현재 `Success` 시점에 `viewModel.pendingState`로 스크롤을 복원한다.
 그 **뒤에** 규칙을 하나 더 얹는다.
@@ -644,7 +644,7 @@ AspectRatioFrameLayout (app:aspectRatio="1.0", background=?colorSurfaceVariant)
 
 ### ⚠️ `pendingState`는 **읽으면 사라진다**
 
-[TrailData.kt:52](../../app/src/main/java/me/zhanghai/android/files/filelist/TrailData.kt#L52):
+[TrailData.kt:52](../app/src/main/java/me/zhanghai/android/files/filelist/TrailData.kt#L52):
 
 ```kotlin
 val pendingState: Parcelable?
@@ -708,7 +708,7 @@ if (stateful is Success) {
 ### 그 밖
 
 - `scrollToPosition(itemCount - 1)`의 **타이밍은 안전하다.** `ListDiffer`는 동기 구현이라
-  ([ListDiffer.kt](../../app/src/main/java/me/zhanghai/android/files/ui/ListDiffer.kt))
+  ([ListDiffer.kt](../app/src/main/java/me/zhanghai/android/files/ui/ListDiffer.kt))
   바로 앞의 `updateAdapterFileList()`가 끝난 시점에 `itemCount`가 이미 갱신돼 있다.
   `AsyncListDiffer`였다면 한 프레임 미뤄야 했을 자리다.
 - 재정렬로 인한 튐은 없다 — 1단계~2로 목록이 처음 그려질 때 이미 정렬이 끝나 있다.
@@ -729,7 +729,7 @@ if (stateful is Success) {
 
 ### 6.1 저장 규칙 변경
 
-**파일**: [`filelist/FileViewTypeLiveData.kt`](../../app/src/main/java/me/zhanghai/android/files/filelist/FileViewTypeLiveData.kt)
+**파일**: [`filelist/FileViewTypeLiveData.kt`](../app/src/main/java/me/zhanghai/android/files/filelist/FileViewTypeLiveData.kt)
 
 ```kotlin
 // 현재
@@ -752,7 +752,7 @@ fun putValue(value: FileViewType) {
 
 - `res/menu/file_list.xml`에서 `action_view_sort_path_specific` 항목 삭제
 - `MenuBinding`의 `viewSortPathSpecificItem` 및 관련 분기 삭제
-- [`FileViewSortPathSpecificLiveData.kt`](../../app/src/main/java/me/zhanghai/android/files/filelist/FileViewSortPathSpecificLiveData.kt) 및
+- [`FileViewSortPathSpecificLiveData.kt`](../app/src/main/java/me/zhanghai/android/files/filelist/FileViewSortPathSpecificLiveData.kt) 및
   `onViewSortPathSpecificChanged()` 삭제
 - 문자열 `file_list_action_view_sort_path_specific` 제거
   (번역 파일 다수에 존재 — 미사용 문자열이라 남겨둬도 무해하나, 기본 `values/strings.xml`에서는 제거)
@@ -782,7 +782,7 @@ fun putValue(value: FileViewType) {
 이라고 확정했으므로, 설정 노출도 같이 가야 대칭이 맞는다.
 
 초기화 구현이 간단하다 — 경로별 설정은 **별도 SharedPreferences 파일**에 들어 있다
-([SettingLiveData.kt:38](../../app/src/main/java/me/zhanghai/android/files/settings/SettingLiveData.kt#L38)):
+([SettingLiveData.kt:38](../app/src/main/java/me/zhanghai/android/files/settings/SettingLiveData.kt#L38)):
 
 ```
 파일명: "<기본_prefs_이름>_path"
@@ -856,7 +856,7 @@ media_date_sunday     일요일 빨강
 
 ### 8.2 바인딩
 
-**파일**: [`filelist/FileListAdapter.kt`](../../app/src/main/java/me/zhanghai/android/files/filelist/FileListAdapter.kt) — `bindDateViewHolder()`
+**파일**: [`filelist/FileListAdapter.kt`](../app/src/main/java/me/zhanghai/android/files/filelist/FileListAdapter.kt) — `bindDateViewHolder()`
 
 - **월·일 줄(`dateText`)에만** 색을 준다. 연도 줄(`yearText`)은 그대로 흐린 보조색이다.
 - 요일은 타일이 들고 있는 `epochMillis`를 **기기 시간대**로 해석해 구한다.

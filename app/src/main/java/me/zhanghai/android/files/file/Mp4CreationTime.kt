@@ -15,7 +15,7 @@ import java.time.Instant
 /**
  * Reads `creation_time` from the `mvhd` box of an ISO base media file (MP4/MOV).
  *
- * See PersonalDev/Doc/09-media-view-mode-plan.md 1.1.
+ * See doc/09-media-view-mode-plan.md 1.1.
  *
  * This walks the top level box chain by *seeking*, never by reading through. All 50 sample files
  * measured had `moov` near the end of the file (13KB ~ 287KB from the tail), so reading through

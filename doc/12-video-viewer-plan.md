@@ -15,7 +15,7 @@
 
 > ⚠️ **커밋은 사용자만 한다.** 이 계획서의 각 단계 끝에는 **커밋 메시지 초안**만 적혀 있다.
 > 작업자(사람이든 Claude든)는 파일 변경까지만 하고 멈춘다. `git add`도 하지 않는다.
-> [프로젝트 CLAUDE.md](../../CLAUDE.md) 참고.
+> [프로젝트 CLAUDE.md](../CLAUDE.md) 참고.
 
 > ⚠️ **이 프로젝트에는 테스트 소스셋이 없다.** `app/src` 아래에 `main` 뿐이고
 > `test`/`androidTest` 디렉터리도, JUnit·Espresso 의존성도 없다. 이 기능은 실제 재생과
@@ -161,7 +161,7 @@ ls -l app/build/outputs/apk/debug/*.apk
 
 ### 0.2 의존성 추가
 
-- [ ] [app/build.gradle](../../app/build.gradle)의 androidx 블록에 두 줄을 넣는다.
+- [ ] [app/build.gradle](../app/build.gradle)의 androidx 블록에 두 줄을 넣는다.
       **알파벳 순서를 지킨다** — `lifecycle` 다음, `preference` 앞이다.
 
 ```gradle
@@ -211,7 +211,7 @@ ls -l app/build/outputs/apk/debug/*.apk
 ```
 
 - [ ] **release 빌드도 한 번 해 본다.** 이 프로젝트는 release에서 `minifyEnabled true`,
-      `shrinkResources true`다([app/build.gradle:76](../../app/build.gradle#L76)).
+      `shrinkResources true`다([app/build.gradle:76](../app/build.gradle#L76)).
       Media3는 자체 consumer ProGuard 규칙을 들고 오지만, 확인은 여기서 해 두는 편이
       나중에 원인을 찾는 것보다 싸다.
 
@@ -241,11 +241,11 @@ JAVA_HOME="/c/Program Files/Android/Android Studio/jbr" ./gradlew assembleReleas
 
 | 파일 | 줄 | 내용 |
 |---|---|---|
-| [AndroidManifest.xml:339](../../app/src/main/AndroidManifest.xml#L339) | 1줄 | `android:name` |
-| [FileListFragment.kt:133](../../app/src/main/java/me/zhanghai/android/files/filelist/FileListFragment.kt#L133) | import | |
-| [FileListFragment.kt:1375](../../app/src/main/java/me/zhanghai/android/files/filelist/FileListFragment.kt#L1375) | 호출 | `maybeAddImageViewerActivityExtras(...)` |
-| [FileListFragment.kt:1393](../../app/src/main/java/me/zhanghai/android/files/filelist/FileListFragment.kt#L1393) | 정의 | 같은 함수 |
-| [FileListFragment.kt:1420](../../app/src/main/java/me/zhanghai/android/files/filelist/FileListFragment.kt#L1420) | 호출 | `ImageViewerActivity.putExtras(...)` |
+| [AndroidManifest.xml:339](../app/src/main/AndroidManifest.xml#L339) | 1줄 | `android:name` |
+| [FileListFragment.kt:133](../app/src/main/java/me/zhanghai/android/files/filelist/FileListFragment.kt#L133) | import | |
+| [FileListFragment.kt:1375](../app/src/main/java/me/zhanghai/android/files/filelist/FileListFragment.kt#L1375) | 호출 | `maybeAddImageViewerActivityExtras(...)` |
+| [FileListFragment.kt:1393](../app/src/main/java/me/zhanghai/android/files/filelist/FileListFragment.kt#L1393) | 정의 | 같은 함수 |
+| [FileListFragment.kt:1420](../app/src/main/java/me/zhanghai/android/files/filelist/FileListFragment.kt#L1420) | 호출 | `ImageViewerActivity.putExtras(...)` |
 
 그래서 기계적 변경이고 위험이 낮다. **Android Studio의 Refactor > Rename을 쓰는 편이
 가장 안전하다** — 레이아웃 이름을 바꾸면 뷰 바인딩 클래스 이름(`ImageViewerFragmentBinding`
@@ -253,7 +253,7 @@ JAVA_HOME="/c/Program Files/Android/Android Studio/jbr" ./gradlew assembleReleas
 
 ### 1.3 ⚠️ 인텐트 extra 키가 클래스 이름에서 나온다
 
-[ImageViewerActivity.kt](../../app/src/main/java/me/zhanghai/android/files/viewer/image/ImageViewerActivity.kt)의
+[ImageViewerActivity.kt](../app/src/main/java/me/zhanghai/android/files/viewer/image/ImageViewerActivity.kt)의
 extra 키는 클래스 이름을 문자열로 쓴다.
 
 ```kotlin
@@ -308,7 +308,7 @@ grep -rl "image_viewer_" app/src/main/res/ | wc -l   # 32
       사용자에게 "이미지"라는 말이 보이지 않는다.
 - [ ] `image_viewer_delete_message_format`도 **손대지 않는다.** 이건 리터럴이 아니라
       `translatable="false"`가 붙은 **별칭**이다
-      ([values/strings.xml:701](../../app/src/main/res/values/strings.xml#L701) →
+      ([values/strings.xml:701](../app/src/main/res/values/strings.xml#L701) →
       `@string/file_delete_message_file_format`). `values-ko`에는 애초에 이 키가 없다 —
       번역할 것이 없기 때문이다. **새로 넣으면 안 된다.**
 - [ ] 나머지 30개 번역 파일은 **건드리지 않는다.** 그쪽 `image_viewer_title`은 각 언어의
@@ -376,7 +376,7 @@ val Path.isPlayableVideo: Boolean
 #### ⚠️ 왜 `AndroidFileTypeDetector`를 쓰지 않는가
 
 뷰어의 기존 코드는 MIME 타입을 이렇게 알아낸다
-([MediaViewerAdapter.loadImageInfo()](../../app/src/main/java/me/zhanghai/android/files/viewer/image/ImageViewerAdapter.kt)).
+([MediaViewerAdapter.loadImageInfo()](../app/src/main/java/me/zhanghai/android/files/viewer/image/ImageViewerAdapter.kt)).
 
 ```kotlin
 val attributes = readAttributes(BasicFileAttributes::class.java)   // ← 파일 시스템을 읽는다
@@ -388,14 +388,14 @@ val mimeType = AndroidFileTypeDetector.getMimeType(this, attributes).asMimeType(
 원격 경로에서는 ANR까지 간다.
 
 `MimeType.guessFromPath()`는 파일 이름의 확장자를 메모리 안의 맵에서 찾는 순수 문자열 연산이다
-([MimeTypeConversionExtensions.kt:14](../../app/src/main/java/me/zhanghai/android/files/file/MimeTypeConversionExtensions.kt#L14)).
+([MimeTypeConversionExtensions.kt:14](../app/src/main/java/me/zhanghai/android/files/file/MimeTypeConversionExtensions.kt#L14)).
 `.mov` → `video/quicktime`, `.mp4` → `video/mp4`가 이미 등록돼 있다.
 확장자가 없거나 엉뚱하면 사진 페이지로 취급되고, 그 페이지는 8단계의 오류 표시로 떨어진다 —
 크래시가 아니다.
 
 ### 2.2 뷰어 목록에 동영상 포함
 
-[FileListFragment.kt:1393](../../app/src/main/java/me/zhanghai/android/files/filelist/FileListFragment.kt#L1393)
+[FileListFragment.kt:1393](../app/src/main/java/me/zhanghai/android/files/filelist/FileListFragment.kt#L1393)
 (1단계에서 `maybeAddMediaViewerExtras`로 이름이 바뀌었다.)
 
 - [ ] 이른 반환을 사진과 재생 가능한 동영상 둘 다 통과하게 바꾸고, **목록을 실제로 붙였는지를
@@ -443,7 +443,7 @@ val mimeType = AndroidFileTypeDetector.getMimeType(this, attributes).asMimeType(
 
 `maybeAddMediaViewerExtras()`는 **인텐트에 extra를 붙일 뿐**이다. 실제로 어느 앱이 뜰지는
 `path.fileProviderUri.createViewIntent(mimeType)`이 만든 암시적 인텐트가 정한다
-([FileListFragment.kt:1370](../../app/src/main/java/me/zhanghai/android/files/filelist/FileListFragment.kt#L1370)).
+([FileListFragment.kt:1370](../app/src/main/java/me/zhanghai/android/files/filelist/FileListFragment.kt#L1370)).
 사진이 우리 뷰어로 오는 건 매니페스트에 `image/*` 필터가 있어서인데,
 **기획서 D4에 따라 `video/*` 필터는 넣지 않기로 했다.**
 
@@ -489,7 +489,7 @@ val mimeType = AndroidFileTypeDetector.getMimeType(this, attributes).asMimeType(
 
 `maybeAddMediaViewerExtras()`는 `position == -1`이면 조용히 반환한다. 그러면 인텐트에
 `extraPathList`가 없고, 프래그먼트는 `paths.isEmpty()`에서 곧바로 `finish()`한다
-([ImageViewerFragment.kt](../../app/src/main/java/me/zhanghai/android/files/viewer/image/ImageViewerFragment.kt)
+([ImageViewerFragment.kt](../app/src/main/java/me/zhanghai/android/files/viewer/image/ImageViewerFragment.kt)
 `onActivityCreated`). 사용자에게는 **누른 동영상이 아무 데서도 안 열리는** 것으로 보인다.
 
 지금까지는 이 경우가 문제가 아니었다. extra가 안 붙어도 암시적 인텐트가 남아 있어서
@@ -594,8 +594,8 @@ val mimeType = AndroidFileTypeDetector.getMimeType(this, attributes).asMimeType(
 #### ⚠️ `surface_type="texture_view"` — 이걸 `surface_view`로 두면 페이지 전환이 깨진다
 
 이 뷰어는 `DepthPageTransformer`를 쓴다
-([MediaViewerFragment](../../app/src/main/java/me/zhanghai/android/files/viewer/image/ImageViewerFragment.kt),
-[ViewPagerTransformers.kt](../../app/src/main/java/me/zhanghai/android/files/ui/ViewPagerTransformers.kt)).
+([MediaViewerFragment](../app/src/main/java/me/zhanghai/android/files/viewer/image/ImageViewerFragment.kt),
+[ViewPagerTransformers.kt](../app/src/main/java/me/zhanghai/android/files/ui/ViewPagerTransformers.kt)).
 이 트랜스포머는 페이지에 **`alpha`, `scaleX/Y`, `translationX`, `translationZ`** 를 건다.
 
 `SurfaceView`는 윈도우에 구멍을 뚫고 그 뒤에서 따로 그리는 뷰라 **`alpha`도 `scale`도 먹지 않는다.**
@@ -609,11 +609,11 @@ Media3의 기본값은 `surface_view`다. **반드시 명시적으로 바꿔야 
 
 ### 2.4 어댑터에 뷰 타입 도입
 
-[MediaViewerAdapter.kt](../../app/src/main/java/me/zhanghai/android/files/viewer/image/ImageViewerAdapter.kt)
+[MediaViewerAdapter.kt](../app/src/main/java/me/zhanghai/android/files/viewer/image/ImageViewerAdapter.kt)
 
 지금은 `SimpleAdapter<Path, MediaViewerAdapter.ViewHolder>`이고 ViewHolder가 하나뿐이다.
 `FileListAdapter`가 날짜 타일을 넣을 때 쓴 것과 **같은 방식**으로 두 종류로 나눈다
-([FileListAdapter.kt:252](../../app/src/main/java/me/zhanghai/android/files/filelist/FileListAdapter.kt#L252)).
+([FileListAdapter.kt:252](../app/src/main/java/me/zhanghai/android/files/filelist/FileListAdapter.kt#L252)).
 
 - [ ] 제네릭의 ViewHolder 타입을 `RecyclerView.ViewHolder`로 올린다.
 
@@ -694,7 +694,7 @@ class MediaViewerAdapter(
 #### ⚠️ 썸네일 요청에 `BasicFileAttributes`가 필요하다
 
 목록의 썸네일은 `load(path to attributes)`로 요청한다
-([FileListAdapter.kt:439](../../app/src/main/java/me/zhanghai/android/files/filelist/FileListAdapter.kt#L439)).
+([FileListAdapter.kt:439](../app/src/main/java/me/zhanghai/android/files/filelist/FileListAdapter.kt#L439)).
 Coil의 `PathAttributesFetcher`가 `Pair<Path, BasicFileAttributes>`를 받게 돼 있어서,
 **`Path` 하나만 넘기면 fetcher가 붙지 않고 조용히 아무것도 안 나온다.**
 
@@ -880,7 +880,7 @@ class VideoPlayerHolder(context: Context, listener: Player.Listener) {
 #### ⚠️ `fileProviderUri`인가 `Uri.fromFile()`인가
 
 이 앱은 자체 `FileProvider`를 갖고 있어서 어떤 `Path`든 `content://` URI를 준다
-([FileProvider.kt](../../app/src/main/java/me/zhanghai/android/files/file/FileProvider.kt)).
+([FileProvider.kt](../app/src/main/java/me/zhanghai/android/files/file/FileProvider.kt)).
 ExoPlayer의 기본 `DataSource`는 `content://`와 `file://`을 모두 연다.
 
 **`fileProviderUri`로 통일한다.** 로컬 파일은 `Uri.fromFile()`이 프로바이더를 거치지 않아
@@ -890,7 +890,7 @@ ExoPlayer의 기본 `DataSource`는 `content://`와 `file://`을 모두 연다.
 
 ### 3.2 프래그먼트에 붙이기
 
-[MediaViewerFragment.kt](../../app/src/main/java/me/zhanghai/android/files/viewer/image/ImageViewerFragment.kt)
+[MediaViewerFragment.kt](../app/src/main/java/me/zhanghai/android/files/viewer/image/ImageViewerFragment.kt)
 
 - [ ] 클래스에 `@OptIn(UnstableApi::class)`를 붙이고 필드를 추가한다.
 
@@ -1215,7 +1215,7 @@ ExoPlayer의 기본 `DataSource`는 `content://`와 `file://`을 모두 연다.
 
 #### ⚠️ 프래그먼트 필드에 두면 화면을 돌릴 때 사라진다
 
-[AndroidManifest.xml:339](../../app/src/main/AndroidManifest.xml#L339)의 이 액티비티에는
+[AndroidManifest.xml:339](../app/src/main/AndroidManifest.xml#L339)의 이 액티비티에는
 `android:configChanges`가 **없다.** 화면을 돌리면 액티비티와 프래그먼트가 새로 만들어지고,
 평범한 필드에 담긴 재생 위치와 배속은 초기화된다. 기획서 §5.3("회전해도 위치 유지")과
 §6.3("뷰어를 닫을 때까지 배속 유지")이 그대로 깨지고, 아래 5.5 검증의
@@ -1223,7 +1223,7 @@ ExoPlayer의 기본 `DataSource`는 `content://`와 `file://`을 모두 연다.
 
 `ViewModel`은 회전을 넘겨 살아남고 **뷰어를 닫으면 함께 사라진다.** 기획서가 요구하는
 "뷰어 세션 동안만 기억한다"(D8)와 수명이 정확히 같다. `lifecycle-viewmodel-ktx`는
-이미 의존성이다([app/build.gradle:142](../../app/build.gradle#L142)).
+이미 의존성이다([app/build.gradle:142](../app/build.gradle#L142)).
 
 - [ ] `app/src/main/java/me/zhanghai/android/files/viewer/media/MediaViewerViewModel.kt`
 
@@ -1255,9 +1255,9 @@ class MediaViewerViewModel : ViewModel() {
 ```
 
 - [ ] 프래그먼트에서 잡는다. 이 저장소가 쓰는 확장 함수다
-      ([FileListFragment.kt:169](../../app/src/main/java/me/zhanghai/android/files/filelist/FileListFragment.kt#L169) 참고 —
+      ([FileListFragment.kt:169](../app/src/main/java/me/zhanghai/android/files/filelist/FileListFragment.kt#L169) 참고 —
       `androidx.fragment.app.viewModels`가 아니라
-      [util/FragmentViewModelLazy.kt](../../app/src/main/java/me/zhanghai/android/files/util/FragmentViewModelLazy.kt)의 것이다).
+      [util/FragmentViewModelLazy.kt](../app/src/main/java/me/zhanghai/android/files/util/FragmentViewModelLazy.kt)의 것이다).
 
 ```kotlin
     private val viewModel by viewModels { { MediaViewerViewModel() } }
@@ -1720,9 +1720,9 @@ fun buildVideoDetails(
     )
 ```
 
-`use`는 [compat/MediaMetadataRetrieverCompat.kt](../../app/src/main/java/me/zhanghai/android/files/compat/MediaMetadataRetrieverCompat.kt),
-`setDataSource(path)`는 [util/MediaMetadataRetrieverPathExtensions.kt](../../app/src/main/java/me/zhanghai/android/files/util/MediaMetadataRetrieverPathExtensions.kt),
-`retriever.location`은 [fileproperties/MediaMetadataRetrieverExtensions.kt](../../app/src/main/java/me/zhanghai/android/files/fileproperties/MediaMetadataRetrieverExtensions.kt)에
+`use`는 [compat/MediaMetadataRetrieverCompat.kt](../app/src/main/java/me/zhanghai/android/files/compat/MediaMetadataRetrieverCompat.kt),
+`setDataSource(path)`는 [util/MediaMetadataRetrieverPathExtensions.kt](../app/src/main/java/me/zhanghai/android/files/util/MediaMetadataRetrieverPathExtensions.kt),
+`retriever.location`은 [fileproperties/MediaMetadataRetrieverExtensions.kt](../app/src/main/java/me/zhanghai/android/files/fileproperties/MediaMetadataRetrieverExtensions.kt)에
 이미 있다. **새로 만들지 않는다.**
 
 `sizeBytes`가 `-1`이면 화면에서 `—`로 나가게 한다 (§7.3).
@@ -1775,7 +1775,7 @@ Parcelable이 아니고, 무엇보다 **값이 나중에 바뀐다** — 한 번
       (`com.google.android.material:material:1.13.0`이 이미 있다. 이 저장소에서
       `BottomSheetDialogFragment`를 쓰는 것은 이 클래스가 처음이다).
       항목은 **`file_properties_tab_item.xml`을 그대로 인플레이트해서 쌓는다** —
-      [FilePropertiesTabFragment.addItemView()](../../app/src/main/java/me/zhanghai/android/files/fileproperties/FilePropertiesTabFragment.kt#L90)가
+      [FilePropertiesTabFragment.addItemView()](../app/src/main/java/me/zhanghai/android/files/fileproperties/FilePropertiesTabFragment.kt#L90)가
       쓰는 것과 같은 레이아웃(`FilePropertiesTabItemBinding`)이라 속성 대화상자와 생김새가
       어긋나지 않는다. 정확한 뷰 아이디는 그 함수를 열어 확인하고 쓴다.
 
@@ -1894,9 +1894,9 @@ class VideoDetailsDialogFragment : BottomSheetDialogFragment() {
 ```
 
 `args`·`putArgs`·`ParcelableParceler`·`requireParentFragment() as Listener`는 같은 패키지의
-[ConfirmDeleteDialogFragment.kt](../../app/src/main/java/me/zhanghai/android/files/viewer/image/ConfirmDeleteDialogFragment.kt)와
+[ConfirmDeleteDialogFragment.kt](../app/src/main/java/me/zhanghai/android/files/viewer/image/ConfirmDeleteDialogFragment.kt)와
 같은 형태다. `show()`만 공용 확장 함수를 쓰지 않는데, 그쪽은 태그를 `null`로 넘겨
-([DialogFragmentExtensions.kt:11](../../app/src/main/java/me/zhanghai/android/files/util/DialogFragmentExtensions.kt#L11))
+([DialogFragmentExtensions.kt:11](../app/src/main/java/me/zhanghai/android/files/util/DialogFragmentExtensions.kt#L11))
 나중에 시트를 찾을 수 없기 때문이다.
 
 ⚠️ `addItem()`의 몸통과 `formatFrameRate()`, `FileSize`의 정확한 서식 함수 이름은
@@ -2030,7 +2030,7 @@ class MediaViewerFragment :
       `R.string.file_properties_media_dimensions_format`, 비트레이트는
       `R.string.file_properties_media_bit_rate_format`(kbps로 나눠 넣는다),
       파일 크기는 `FileSize`의 서식, 촬영 시각은 `Instant.formatLong()`
-      ([FilePropertiesVideoTabFragment.kt](../../app/src/main/java/me/zhanghai/android/files/fileproperties/video/FilePropertiesVideoTabFragment.kt) 참고).
+      ([FilePropertiesVideoTabFragment.kt](../app/src/main/java/me/zhanghai/android/files/fileproperties/video/FilePropertiesVideoTabFragment.kt) 참고).
       **새 서식 문자열을 만들기 전에 그쪽을 먼저 본다.**
 
 - [ ] 항목도 동영상 페이지일 때만 보이게 한다. `onPrepareOptionsMenu`에 한 줄.
@@ -2150,7 +2150,7 @@ class MediaViewerFragment :
 ### 8.2 공유 MIME (기획서 §9)
 
 지금 `share()`는 타입이 `image/*`로 고정돼 있다
-([ImageViewerFragment.kt:204](../../app/src/main/java/me/zhanghai/android/files/viewer/image/ImageViewerFragment.kt#L204)).
+([ImageViewerFragment.kt:204](../app/src/main/java/me/zhanghai/android/files/viewer/image/ImageViewerFragment.kt#L204)).
 
 - [ ] 실제 MIME 타입을 쓰게 바꾼다.
 
@@ -2166,7 +2166,7 @@ class MediaViewerFragment :
 ```
 
 `createSendStreamIntent(mimeType)`은
-[IntentExtensions.kt:138](../../app/src/main/java/me/zhanghai/android/files/util/IntentExtensions.kt#L138)에 이미 있다.
+[IntentExtensions.kt:138](../app/src/main/java/me/zhanghai/android/files/util/IntentExtensions.kt#L138)에 이미 있다.
 `createSendImageIntent`가 `text` 인자로 받던 것은 이 호출부에서 안 쓰고 있었으므로 잃는 것이 없다.
 
 ⚠️ **사진에도 영향이 간다.** 사진의 MIME이 `image/jpeg`처럼 더 구체적으로 나가게 되는데,

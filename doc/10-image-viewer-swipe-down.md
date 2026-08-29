@@ -109,7 +109,7 @@
 
 **닫는 방법** — `activity.onBackPressedDispatcher.onBackPressed()`. `finish()` 가 아니다(D4).
 이 프로젝트는 이미 같은 디스패처를 쓴다
-([FragmentExtensions.kt:38](../../app/src/main/java/me/zhanghai/android/files/util/FragmentExtensions.kt#L38)).
+([FragmentExtensions.kt:38](../app/src/main/java/me/zhanghai/android/files/util/FragmentExtensions.kt#L38)).
 
 ## 4. 구현
 
@@ -124,7 +124,7 @@ SwipeDownDismissLayout   ← 세로 드래그를 가로채고, 자기 자신을 
 └─ (동영상) PlayerView / thumbnailImage / progress / errorLayout
 ```
 
-[SwipeDownDismissLayout.kt](../../app/src/main/java/me/zhanghai/android/files/viewer/media/SwipeDownDismissLayout.kt)
+[SwipeDownDismissLayout.kt](../app/src/main/java/me/zhanghai/android/files/viewer/media/SwipeDownDismissLayout.kt)
 
 - `onInterceptTouchEvent` 에서 §3.2의 시작 조건을 보고 가로챈다. 가로챈 뒤에는
   `parent.requestDisallowInterceptTouchEvent(true)` 로 `ViewPager2` 가 도로 뺏지 못하게 한다.
@@ -156,7 +156,7 @@ override fun requestDisallowInterceptTouchEvent(disallowIntercept: Boolean) {
 ### 4.3 확대 판정 — 뷰 종류별로 다르다
 
 사진 페이지의 `canDismiss` 는 지금 보이는 뷰에 따라 갈린다
-([MediaViewerAdapter.kt](../../app/src/main/java/me/zhanghai/android/files/viewer/media/MediaViewerAdapter.kt)).
+([MediaViewerAdapter.kt](../app/src/main/java/me/zhanghai/android/files/viewer/media/MediaViewerAdapter.kt)).
 
 | 보이는 뷰 | 조건 |
 |---|---|
@@ -173,7 +173,7 @@ override fun requestDisallowInterceptTouchEvent(disallowIntercept: Boolean) {
 
 **재생 컨트롤과는 자동으로 분리된다.** `PlayerControlView` 는 페이지가 아니라 **프래그먼트
 레이아웃**에 있고 `ViewPager2` 위에 겹쳐 있다
-([media_viewer_fragment.xml](../../app/src/main/res/layout/media_viewer_fragment.xml), 12번 §4.1).
+([media_viewer_fragment.xml](../app/src/main/res/layout/media_viewer_fragment.xml), 12번 §4.1).
 컨트롤 영역에서 시작한 터치는 컨트롤이 가져가므로 페이지까지 내려오지 않는다.
 **슬라이더를 아래로 끌어도 닫히지 않는다.** 따로 막을 코드가 필요 없다(D10).
 

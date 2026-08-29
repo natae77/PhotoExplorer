@@ -33,8 +33,8 @@
 | 목록 | 1열 | 아이콘 + 이름 + (수정시각·크기) + `⋮` |
 | 바둑판 | 화면폭/180dp 열 (최소 2) | 16:9 썸네일 + 아이콘 + 이름 + `⋮` |
 
-근거: [FileListFragment.kt:656](../../app/src/main/java/me/zhanghai/android/files/filelist/FileListFragment.kt#L656) `updateSpanCount()`,
-[file_item_grid.xml](../../app/src/main/res/layout/file_item_grid.xml)
+근거: [FileListFragment.kt:656](../app/src/main/java/me/zhanghai/android/files/filelist/FileListFragment.kt#L656) `updateSpanCount()`,
+[file_item_grid.xml](../app/src/main/res/layout/file_item_grid.xml)
 
 바둑판 모드는 썸네일이 16:9인 데다 항목마다 이름 줄과 여백이 붙어서, 사진·동영상이 수십~수백 개
 들어있는 폴더를 **훑어보기**에는 밀도가 낮다. 그리고 정렬 기준에 **촬영 시각**이 없어서
@@ -73,7 +73,7 @@
 | 그 외 파일(문서·압축·오디오 등) | X | 표시하지 않음 |
 
 - 판정 기준은 기존 MIME 유틸을 그대로 쓴다: `MimeType.isImage`, `MimeType.isVideo`
-  ([MimeTypeTypeExtensions.kt:43](../../app/src/main/java/me/zhanghai/android/files/file/MimeTypeTypeExtensions.kt#L43))
+  ([MimeTypeTypeExtensions.kt:43](../app/src/main/java/me/zhanghai/android/files/file/MimeTypeTypeExtensions.kt#L43))
 - **폴더를 표시하는 이유**: 폴더를 숨기면 미디어 모드에서 하위 폴더로 들어갈 방법이 없어져
   파일 관리자로서 쓸 수 없게 된다. "이름을 안 보여준다"는 원칙은 **미디어 타일에만** 적용하고,
   폴더 타일에는 이름을 1줄로 표시한다.
@@ -383,7 +383,7 @@ btime은 **복사한 시각**이 되어 전부 오늘 날짜로 뭉친다. 촬�
 
 1. **캐시 조회** — 키는 `경로 + 크기 + mtime`. 있으면 즉시 반환하고 끝.
 2. **이미지** — `ExifInterface`로 `DateTimeOriginal`
-   ([`inferDateTimeOriginal()`](../../app/src/main/java/me/zhanghai/android/files/fileproperties/image/ExifInterfaceExtensions.kt#L31)).
+   ([`inferDateTimeOriginal()`](../app/src/main/java/me/zhanghai/android/files/fileproperties/image/ExifInterfaceExtensions.kt#L31)).
    EXIF는 파일 앞부분만 읽으므로 저렴하다.
 3. **동영상** — **경량 파싱 우선**: 박스 체인을 따라가 `moov` → `mvhd`의 `creation_time`만 읽는다.
    파일 앞 16바이트로 첫 박스 크기를 얻고, 그 크기만큼 건너뛰어 다음 박스 헤더를 읽는 식으로
@@ -429,7 +429,7 @@ FileListLiveData.loadValue()          ← 백그라운드 스레드
 **캐시가 특히 중요해진다**
 
 `PathObserver`가 폴더 변경을 감지할 때마다 `loadValue()`가 다시 돈다
-([FileListLiveData.kt](../../app/src/main/java/me/zhanghai/android/files/filelist/FileListLiveData.kt)).
+([FileListLiveData.kt](../app/src/main/java/me/zhanghai/android/files/filelist/FileListLiveData.kt)).
 캐시가 없으면 파일 하나 바뀔 때마다 폴더 전체 메타데이터를 다시 읽는다.
 `경로 + 크기 + mtime` 키 캐시로 두 번째 이후는 조회만 하고 끝낸다.
 
@@ -484,7 +484,7 @@ FileListLiveData.loadValue()          ← 백그라운드 스레드
   채팅 앱처럼 "아래가 최신"인 감각.
 - 사용자가 내림차순으로 바꾸면 최신이 맨 위이므로 맨 위에서 시작한다.
 - **예외 — 뒤로가기 복귀**: 하위 폴더에 들어갔다 나온 경우에는 기존 스크롤 위치 복원이 우선한다
-  (`pendingState`, [FileListFragment.kt:619](../../app/src/main/java/me/zhanghai/android/files/filelist/FileListFragment.kt#L619)).
+  (`pendingState`, [FileListFragment.kt:619](../app/src/main/java/me/zhanghai/android/files/filelist/FileListFragment.kt#L619)).
 - **재정렬로 인한 스크롤 튐은 없다.** 생성 시각을 1차 로딩에서 함께 읽으므로(§5.5),
   목록이 처음 그려질 때 이미 정렬이 끝나 있다. 스크롤 위치는 그때 한 번만 정한다.
 
@@ -493,9 +493,9 @@ FileListLiveData.loadValue()          ← 백그라운드 스레드
 ### 7.1 현재 동작과 문제
 
 정렬 메뉴 맨 아래에 **"이 폴더에만 적용"**(Only for this folder,
-[strings.xml:297](../../app/src/main/res/values/strings.xml#L297)) 체크박스가 있고,
+[strings.xml:297](../app/src/main/res/values/strings.xml#L297)) 체크박스가 있고,
 켜야만 그 폴더의 보기 모드·정렬이 경로별로 저장된다
-([FileViewSortPathSpecificLiveData.kt](../../app/src/main/java/me/zhanghai/android/files/filelist/FileViewSortPathSpecificLiveData.kt)).
+([FileViewSortPathSpecificLiveData.kt](../app/src/main/java/me/zhanghai/android/files/filelist/FileViewSortPathSpecificLiveData.kt)).
 
 | # | 문제 |
 |---|---|
@@ -561,7 +561,7 @@ FileListLiveData.loadValue()          ← 백그라운드 스레드
 ## 9. 설정 저장 · 호환성
 
 - ⚠️ **보기 모드 enum 순서**: SharedPreferences에 **enum 이름이 아니라 ordinal(정수)** 로 저장된다
-  ([SettingLiveDatas.kt:239](../../app/src/main/java/me/zhanghai/android/files/settings/SettingLiveDatas.kt#L239)).
+  ([SettingLiveDatas.kt:239](../app/src/main/java/me/zhanghai/android/files/settings/SettingLiveDatas.kt#L239)).
   `MEDIA`는 반드시 **맨 뒤**에 추가한다(LIST=0, GRID=1, MEDIA=2).
   중간에 끼워 넣으면 기존 사용자의 저장된 설정이 다른 모드로 뒤바뀐다.
 - ⚠️ **정렬 기준 enum 순서**: `FileSortOptions`는 `@Parcelize`로 직렬화되어 저장된다.

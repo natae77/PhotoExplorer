@@ -55,17 +55,17 @@
 
 | 화면에 보이는 것 | 출처 |
 |---|---|
-| 위쪽 검정 판 | `appBarLayout`의 `?colorAppBarSurface` = `@color/dark_50_percent` ([themes.xml:89](../../app/src/main/res/values/themes.xml#L89)) |
-| 파일 이름 | 툴바 제목 ([MediaViewerFragment.kt:511](../../app/src/main/java/me/zhanghai/android/files/viewer/media/MediaViewerFragment.kt#L511)) |
-| `3 / 20`, `1.5×` | 툴바 부제목 ([MediaViewerFragment.kt:527](../../app/src/main/java/me/zhanghai/android/files/viewer/media/MediaViewerFragment.kt#L527)) |
-| 아래쪽 검정 판 | Media3 기본 컨트롤 레이아웃의 `exo_controls_background` + `minHeight="220dp"` ([media_viewer_fragment.xml:19](../../app/src/main/res/layout/media_viewer_fragment.xml#L19)) |
+| 위쪽 검정 판 | `appBarLayout`의 `?colorAppBarSurface` = `@color/dark_50_percent` ([themes.xml:89](../app/src/main/res/values/themes.xml#L89)) |
+| 파일 이름 | 툴바 제목 ([MediaViewerFragment.kt:511](../app/src/main/java/me/zhanghai/android/files/viewer/media/MediaViewerFragment.kt#L511)) |
+| `3 / 20`, `1.5×` | 툴바 부제목 ([MediaViewerFragment.kt:527](../app/src/main/java/me/zhanghai/android/files/viewer/media/MediaViewerFragment.kt#L527)) |
+| 아래쪽 검정 판 | Media3 기본 컨트롤 레이아웃의 `exo_controls_background` + `minHeight="220dp"` ([media_viewer_fragment.xml:19](../app/src/main/res/layout/media_viewer_fragment.xml#L19)) |
 | 톱니바퀴 `⚙` | Media3 기본 컨트롤의 `exo_settings` — 안에 **재생 속도**와 **오디오 트랙 선택**이 들어 있다 |
-| 영상 넘길 때 도는 원 | 동영상 페이지의 `ProgressBar` + `show_buffering="when_playing"` ([media_viewer_video_item.xml:21](../../app/src/main/res/layout/media_viewer_video_item.xml#L21)) |
+| 영상 넘길 때 도는 원 | 동영상 페이지의 `ProgressBar` + `show_buffering="when_playing"` ([media_viewer_video_item.xml:21](../app/src/main/res/layout/media_viewer_video_item.xml#L21)) |
 
 **문제는 이것들이 실제로 쓰이지 않는다는 것이다.**
 
 - 파일 이름과 `3 / 20`은 이 앱에서 **읽을 일이 없다.** 어떤 사진을 보고 있는지는 사진이 말해 준다.
-- 톱니바퀴 안의 두 항목 중 **속도는 이미 `⋮` 메뉴에 따로 있고**([media_viewer.xml:13](../../app/src/main/res/menu/media_viewer.xml#L13)),
+- 톱니바퀴 안의 두 항목 중 **속도는 이미 `⋮` 메뉴에 따로 있고**([media_viewer.xml:13](../app/src/main/res/menu/media_viewer.xml#L13)),
   오디오 트랙은 폰으로 찍은 영상에 **하나뿐이라 고를 것이 없다.**
 - 검정 판은 그 안 내용물이 몇 개 없는데도 화면의 위아래를 두껍게 잘라먹는다. 특히 하단은
   `220dp`가 고정으로 잡혀 있다.
@@ -100,7 +100,7 @@
 `appBarLayout`의 배경을 **완전 투명**으로 바꾼다.
 
 이 배경은 상태바 영역까지 그리고 있었다 —
-"Our app bar will draw the status bar background" ([MediaViewerFragment.kt:118](../../app/src/main/java/me/zhanghai/android/files/viewer/media/MediaViewerFragment.kt#L118)).
+"Our app bar will draw the status bar background" ([MediaViewerFragment.kt:118](../app/src/main/java/me/zhanghai/android/files/viewer/media/MediaViewerFragment.kt#L118)).
 `statusBarColor`는 이미 `TRANSPARENT`이므로, 앱 바 배경만 없애면 **상태바 자리까지 사진이 올라온다.**
 이것이 의도한 결과다.
 
@@ -206,7 +206,7 @@ ExoPlayer의 기본 트랙 선택이 그대로 동작한다. 폰으로 찍은 �
 
 | 출처 | 언제 뜨나 |
 |---|---|
-| 페이지 자신의 `ProgressBar` — **썸네일 로딩용** | 페이지가 바인딩되는 즉시 ([MediaViewerAdapter.kt:130](../../app/src/main/java/me/zhanghai/android/files/viewer/media/MediaViewerAdapter.kt#L130)) |
+| 페이지 자신의 `ProgressBar` — **썸네일 로딩용** | 페이지가 바인딩되는 즉시 ([MediaViewerAdapter.kt:130](../app/src/main/java/me/zhanghai/android/files/viewer/media/MediaViewerAdapter.kt#L130)) |
 | 재생 뷰가 스스로 그리는 **버퍼링 표시** (`show_buffering`) | 재생을 준비하는 동안 |
 
 **둘을 페이지마다 하나의 표시로 합치고, 그 하나를 지연시킨다.** 재생 뷰의 자체 표시는 끈다 —

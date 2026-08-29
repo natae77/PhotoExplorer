@@ -27,7 +27,7 @@ import java.time.Instant
 import java.time.format.DateTimeFormatter
 
 /**
- * Resolves the "media created time" of a file, see PersonalDev/Doc/08-media-view-mode-spec.md 5.
+ * Resolves the "media created time" of a file, see doc/08-media-view-mode-spec.md 5.
  *
  * The rule is `min(metadata timestamp, last modified time)`: shooting a photo cannot happen after
  * the file was last written, so whichever of the two is later is assumed to be a timestamp that got

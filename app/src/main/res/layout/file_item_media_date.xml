@@ -6,7 +6,7 @@
   -->
 
 <!--
-  ~ Date tile, see PersonalDev/Doc/08-media-view-mode-spec.md 4.3. Same square cell as a media tile,
+  ~ Date tile, see doc/08-media-view-mode-spec.md 4.3. Same square cell as a media tile,
   ~ but purely decorative: not clickable, not focusable, and with no ripple.
   -->
 <me.zhanghai.android.files.ui.AspectRatioFrameLayout

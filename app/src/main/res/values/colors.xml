@@ -48,7 +48,7 @@
     <color name="file_icon_yellow">#F4B400</color>
 
     <!--
-      ~ Media view mode date tiles, see PersonalDev/Doc/08-media-view-mode-spec.md 4.3 (D23).
+      ~ Media view mode date tiles, see doc/08-media-view-mode-spec.md 4.3 (D23).
       ~ Decoration only: the tile already spells the date out, so nothing is lost when the colours
       ~ cannot be told apart.
       -->

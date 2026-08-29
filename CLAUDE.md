@@ -1,8 +1,8 @@
 # PhotoExplorer — 프로젝트 지침
 
-`zhanghai/MaterialFiles` fork. 개발 기록과 기획·계획은 [`PersonalDev/Doc/`](PersonalDev/Doc/README.md)에 있고,
-새로 시작한다면 [09번 구현 계획](PersonalDev/Doc/09-media-view-mode-plan.md)과
-[미결 항목](PersonalDev/Doc/media-view-mode-open-items.md)을 보면 된다.
+`zhanghai/MaterialFiles` fork. 개발 기록과 기획·계획은 [`doc/`](doc/README.md)에 있고,
+새로 시작한다면 [09번 구현 계획](doc/09-media-view-mode-plan.md)과
+[미결 항목](doc/media-view-mode-open-items.md)을 보면 된다.
 
 ## git 커밋은 **절대** 하지 않는다
 

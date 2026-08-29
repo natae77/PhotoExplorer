@@ -63,7 +63,7 @@
 
 그냥 빠진 게 아니라, **그대로 두면 백지 화면이 나온다.**
 
-[FileListFragment.kt:609](../../app/src/main/java/me/zhanghai/android/files/filelist/FileListFragment.kt#L609):
+[FileListFragment.kt:609](../app/src/main/java/me/zhanghai/android/files/filelist/FileListFragment.kt#L609):
 
 ```kotlin
 val hasFiles = !files.isNullOrEmpty()          // files = stateful.value — 필터 이전 목록
@@ -89,7 +89,7 @@ stateful.value = [문서 20개]     → hasFiles = true  → emptyView 안 뜸
 - 필터를 거친 뒤의 개수로 빈 상태를 판정한다. 필터 로직이 `updateAdapterFileList()` 안에
   있으므로(§3.3), 빈 상태 판정도 거기서 같이 하거나 필터 결과를 밖으로 내보내야 한다.
 - 문자열이 하나 더 필요하다. 현재 `file_list_empty`는 "No files"뿐이다
-  ([strings.xml:320](../../app/src/main/res/values/strings.xml#L320)).
+  ([strings.xml:320](../app/src/main/res/values/strings.xml#L320)).
   미디어 모드 전용 문구를 추가한다 — ko "표시할 미디어가 없습니다" / en "No media".
 - 부제(개수)는 **지금대로 전체 개수**를 유지한다. 기획서 D2가 그걸 요구한다.
   "화면은 비었는데 부제는 20개"가 되지만, 그게 D2의 의도다
@@ -111,7 +111,7 @@ stateful.value = [문서 20개]     → hasFiles = true  → emptyView 안 뜸
 **참고할 기존 구조**
 
 - 선택 상태는 `holder.itemLayout.isChecked = checked`로 들어간다
-  ([FileListAdapter.kt:222](../../app/src/main/java/me/zhanghai/android/files/filelist/FileListAdapter.kt#L222)).
+  ([FileListAdapter.kt:222](../app/src/main/java/me/zhanghai/android/files/filelist/FileListAdapter.kt#L222)).
   루트가 `CheckableForegroundLinearLayout`이라 `state_checked`가 자식들에게 전파된다.
 - 배경은 `CheckableItemBackground.create(radius, radius, context)`로 만든다
   (미디어 타일은 라운드 없음이므로 `0f, 0f` — 목록 모드와 같다).
@@ -128,7 +128,7 @@ stateful.value = [문서 20개]     → hasFiles = true  → emptyView 안 뜸
 Pick 모드에서 어댑터는 이렇게 다르게 동작한다:
 
 - `isFileSelectable(file)` — `pickOptions.mimeTypes`에 안 맞는 파일은 선택 불가
-  ([FileListAdapter.kt:135](../../app/src/main/java/me/zhanghai/android/files/filelist/FileListAdapter.kt#L135))
+  ([FileListAdapter.kt:135](../app/src/main/java/me/zhanghai/android/files/filelist/FileListAdapter.kt#L135))
 - 선택 불가 항목은 `itemLayout.isEnabled = false`로 흐려진다
 - `allowMultiple`이 꺼져 있으면 새로 고를 때 기존 선택을 지운다
 
@@ -222,7 +222,7 @@ nullable로 들고 있다. 미디어 레이아웃에도 같은 뷰를 두고 기
 
 계획서 §6.3이 기본 보기 모드를 `ListPreference`로 노출한다. 저장 형식을 확인했다.
 
-[SettingLiveDatas.kt:239](../../app/src/main/java/me/zhanghai/android/files/settings/SettingLiveDatas.kt#L239):
+[SettingLiveDatas.kt:239](../app/src/main/java/me/zhanghai/android/files/settings/SettingLiveDatas.kt#L239):
 
 ```kotlin
 override fun putValue(sharedPreferences: SharedPreferences, key: String, value: E) {
@@ -262,7 +262,7 @@ override fun getValue(...): E {
 
 확인했다. **콜백은 오지만 무시된다.**
 
-[SettingLiveData.kt:65](../../app/src/main/java/me/zhanghai/android/files/settings/SettingLiveData.kt#L65):
+[SettingLiveData.kt:65](../app/src/main/java/me/zhanghai/android/files/settings/SettingLiveData.kt#L65):
 
 ```kotlin
 override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences, key: String?) {
@@ -291,7 +291,7 @@ override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences, key
 > 원격 경로(`path.isRemotePath`)이고 `READ_REMOTE_FILES_FOR_THUMBNAIL`이 꺼져 있으면 → null
 
 같은 절이 참고하라고 가리킨 `supportsThumbnail`
-([FileItemExtensions.kt:63](../../app/src/main/java/me/zhanghai/android/files/filelist/FileItemExtensions.kt#L63))은
+([FileItemExtensions.kt:63](../app/src/main/java/me/zhanghai/android/files/filelist/FileItemExtensions.kt#L63))은
 조건이 하나 더 있다:
 
 ```kotlin
@@ -315,17 +315,17 @@ if (path.isRemotePath) {
 계획서 §2.1이 "`loadFileItem()`에서 채운다"고 했고, §8-5번이 "생성 지점을 전수 확인"하라고
 적어 뒀다. 생성 지점(`FileItem(...)`)은 확인했다 — 두 곳이다:
 
-- `Path.loadFileItem()` ([FileItem.kt:48](../../app/src/main/java/me/zhanghai/android/files/file/FileItem.kt#L48))
-- `createDummyArchiveRoot()` ([FileItemExtensions.kt:103](../../app/src/main/java/me/zhanghai/android/files/filelist/FileItemExtensions.kt#L103)) — 가짜 항목이므로 null
+- `Path.loadFileItem()` ([FileItem.kt:48](../app/src/main/java/me/zhanghai/android/files/file/FileItem.kt#L48))
+- `createDummyArchiveRoot()` ([FileItemExtensions.kt:103](../app/src/main/java/me/zhanghai/android/files/filelist/FileItemExtensions.kt#L103)) — 가짜 항목이므로 null
 
 그런데 **`loadFileItem()`의 호출부**는 전수 확인이 안 돼 있다. 목록 로딩 말고도 세 군데다:
 
 | 호출부 | 언제 도는가 | 영향 |
 |---|---|---|
-| [FileListLiveData.kt:46](../../app/src/main/java/me/zhanghai/android/files/filelist/FileListLiveData.kt#L46) | 폴더 목록 로딩 | 의도한 자리 |
-| [SearchFileListLiveData.kt:42](../../app/src/main/java/me/zhanghai/android/files/filelist/SearchFileListLiveData.kt#L42) | 검색 결과 | 검색 결과가 많으면 비용이 붙는다 |
-| [FileJobs.kt:1305-1306](../../app/src/main/java/me/zhanghai/android/files/filejob/FileJobs.kt#L1305) | **복사/이동 충돌 다이얼로그** | 충돌 파일마다 source·target 둘 다 파싱 |
-| [FileLiveData.kt:39](../../app/src/main/java/me/zhanghai/android/files/fileproperties/FileLiveData.kt#L39) | 파일 속성 화면 | 1개뿐이라 무해 |
+| [FileListLiveData.kt:46](../app/src/main/java/me/zhanghai/android/files/filelist/FileListLiveData.kt#L46) | 폴더 목록 로딩 | 의도한 자리 |
+| [SearchFileListLiveData.kt:42](../app/src/main/java/me/zhanghai/android/files/filelist/SearchFileListLiveData.kt#L42) | 검색 결과 | 검색 결과가 많으면 비용이 붙는다 |
+| [FileJobs.kt:1305-1306](../app/src/main/java/me/zhanghai/android/files/filejob/FileJobs.kt#L1305) | **복사/이동 충돌 다이얼로그** | 충돌 파일마다 source·target 둘 다 파싱 |
+| [FileLiveData.kt:39](../app/src/main/java/me/zhanghai/android/files/fileproperties/FileLiveData.kt#L39) | 파일 속성 화면 | 1개뿐이라 무해 |
 
 `FileJobs` 쪽이 눈에 띈다. 사진 수백 장을 덮어쓰기로 복사하면 충돌마다 mvhd 파싱이 붙는데,
 **그 파일들은 방금 목록을 읽으며 캐시에 들어갔을 가능성이 높다**(같은 프로세스, 같은 캐시 키).
@@ -376,7 +376,7 @@ mimeType.isImage → ExifInterface.inferDateTimeOriginal()
 ```
 
 실제로는 인자를 받는다
-([ExifInterfaceExtensions.kt:31](../../app/src/main/java/me/zhanghai/android/files/fileproperties/image/ExifInterfaceExtensions.kt#L31)):
+([ExifInterfaceExtensions.kt:31](../app/src/main/java/me/zhanghai/android/files/fileproperties/image/ExifInterfaceExtensions.kt#L31)):
 
 ```kotlin
 fun ExifInterface.inferDateTimeOriginal(lastModifiedTime: Instant): Instant?

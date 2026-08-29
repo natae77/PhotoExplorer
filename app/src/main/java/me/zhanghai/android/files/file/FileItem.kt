@@ -33,7 +33,7 @@ data class FileItem(
     val isHidden: Boolean,
     val mimeType: MimeType,
     // Long? instead of Instant/FileTime so that no extra Parceler is needed. Null means "unknown",
-    // callers fall back to the last modified time. See PersonalDev/Doc/09-media-view-mode-plan.md.
+    // callers fall back to the last modified time. See doc/09-media-view-mode-plan.md.
     val mediaCreatedTimeMillis: Long? = null
 ) : Parcelable {
     val attributes: BasicFileAttributes
