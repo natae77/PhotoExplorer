@@ -85,6 +85,9 @@ class MediaViewerFragment :
 
     private var isSystemUiVisible = true
 
+    /** Wrapping twice would stack disc on disc, see spec 11a section 3.3. */
+    private var isOverflowIconScrimmed = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -113,9 +116,17 @@ class MediaViewerFragment :
 
         val activity = activity as AppCompatActivity
         activity.setSupportActionBar(binding.toolbar)
-        activity.supportActionBar!!.setDisplayHomeAsUpEnabled(true)
-        // Our app bar will draw the status bar background.
+        activity.supportActionBar!!.apply {
+            setDisplayHomeAsUpEnabled(true)
+            // The app bar has no background any more and shows nothing but its two icons.
+            // See spec 11a section 3.2.
+            setDisplayShowTitleEnabled(false)
+        }
+        // The app bar is transparent, so the media reaches the status bar. See spec 11a section 3.1.
         activity.window.statusBarColor = Color.TRANSPARENT
+        // The icons would disappear over a bright photo without a scrim, see spec 11a section 3.3.
+        binding.toolbar.navigationIcon =
+            binding.toolbar.navigationIcon?.withCircleScrim(requireContext())
         binding.appBarLayout.applySystemWindowInsetsToPadding(left = true, top = true, right = true)
         binding.playerControlView.applySystemWindowInsetsToPadding(
             left = true, bottom = true, right = true
@@ -150,7 +161,6 @@ class MediaViewerFragment :
             setPageTransformer(DepthPageTransformer)
             registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
                 override fun onPageSelected(position: Int) {
-                    updateTitle()
                     // Do not start here. Fast flinging fires this for every page passed, and each
                     // one would briefly play sound. See spec 11 section 5.1.
                     stopPlaybackIfPageChanged()
@@ -196,6 +206,8 @@ class MediaViewerFragment :
 
         playerHolder?.release()
         playerHolder = null
+        // The new view will get a fresh, unwrapped overflow icon.
+        isOverflowIconScrimmed = false
     }
 
     private fun stopPlaybackIfPageChanged() {
@@ -226,7 +238,10 @@ class MediaViewerFragment :
         if (position == -1) {
             return
         }
-        val videoBinding = videoBindingAt(position) ?: return
+        val holder = videoHolderAt(position) ?: return
+        // The page we are leaving must not show buffering of the video we took away from it.
+        holder.progress.end(DelayedProgress.Reason.BUFFERING)
+        val videoBinding = holder.binding
         videoBinding.playerView.isVisible = false
         videoBinding.thumbnailImage.animate().cancel()
         videoBinding.thumbnailImage.alpha = 1f
@@ -272,8 +287,11 @@ class MediaViewerFragment :
     }
 
     /** The binding of the current page, or null when it is not a bound video page. */
+    private val currentVideoHolder: MediaViewerAdapter.VideoViewHolder?
+        get() = videoHolderAt(binding.viewPager.currentItem)
+
     private val currentVideoBinding: MediaViewerVideoItemBinding?
-        get() = videoBindingAt(binding.viewPager.currentItem)
+        get() = currentVideoHolder?.binding
 
     /**
      * The binding of the video page at [position], or null when there is none right now.
@@ -281,10 +299,10 @@ class MediaViewerFragment :
      * ViewPager2 hides its RecyclerView and offers no public way to reach a page, and a page that
      * is off screen may have no view at all. Callers give up quietly when this returns null.
      */
-    private fun videoBindingAt(position: Int): MediaViewerVideoItemBinding? {
+    private fun videoHolderAt(position: Int): MediaViewerAdapter.VideoViewHolder? {
         val recyclerView = binding.viewPager.getChildAt(0) as? RecyclerView ?: return null
         val holder = recyclerView.findViewHolderForAdapterPosition(position)
-        return (holder as? MediaViewerAdapter.VideoViewHolder)?.binding
+        return holder as? MediaViewerAdapter.VideoViewHolder
     }
 
     private val playerListener = object : Player.Listener {
@@ -303,6 +321,7 @@ class MediaViewerFragment :
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
+            updateBufferingProgress(playbackState)
             if (playbackState == Player.STATE_READY) {
                 // videoFormat and duration are known only now, see spec 11 section 7.1.
                 updateVideoDetailsSheet()
@@ -314,12 +333,11 @@ class MediaViewerFragment :
         }
 
         override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
-            // PlayerControlView has a speed menu of its own, so the speed can change without
-            // setPlaybackSpeed(). Keeping our copy in sync keeps the subtitle and the checked menu
-            // item honest, and stops the next video from reverting the speed.
+            // Our own menu is the only way to change this now, but keeping our copy in sync
+            // keeps the checked menu item honest and stops the next video from reverting the
+            // speed.
             if (playbackParameters.speed != viewModel.playbackSpeed) {
                 viewModel.playbackSpeed = playbackParameters.speed
-                updateTitle()
                 requireActivity().invalidateOptionsMenu()
             }
         }
@@ -334,6 +352,19 @@ class MediaViewerFragment :
         }
     }
 
+    /** Only the page that owns the player may show its buffering, see spec 11a section 6.1. */
+    private fun updateBufferingProgress(playbackState: Int) {
+        if (playerHolder?.currentPath != currentPath) {
+            return
+        }
+        val holder = currentVideoHolder ?: return
+        if (playbackState == Player.STATE_BUFFERING) {
+            holder.progress.begin(DelayedProgress.Reason.BUFFERING)
+        } else {
+            holder.progress.end(DelayedProgress.Reason.BUFFERING)
+        }
+    }
+
     override fun onViewStateRestored(savedInstanceState: Bundle?) {
         super.onViewStateRestored(savedInstanceState)
 
@@ -343,9 +374,8 @@ class MediaViewerFragment :
             return
         }
 
-        updateTitle()
         // onPageSelected() never fires for the initial page because the callback is registered
-        // after setCurrentItem(), which is also why updateTitle() is called here.
+        // after setCurrentItem().
         updatePlayerControlVisibility()
     }
 
@@ -364,6 +394,15 @@ class MediaViewerFragment :
     override fun onPrepareOptionsMenu(menu: Menu) {
         super.onPrepareOptionsMenu(menu)
 
+        // The overflow icon only exists once the menu has been created, so it cannot be wrapped
+        // along with the navigation icon in onActivityCreated().
+        if (!isOverflowIconScrimmed) {
+            val overflowIcon = binding.toolbar.overflowIcon
+            if (overflowIcon != null) {
+                binding.toolbar.overflowIcon = overflowIcon.withCircleScrim(requireContext())
+                isOverflowIconScrimmed = true
+            }
+        }
         val isVideo = currentPath.isPlayableVideo
         menu.findItem(R.id.action_playback_speed).isVisible = isVideo
         menu.findItem(R.id.action_video_details).isVisible = isVideo
@@ -424,11 +463,10 @@ class MediaViewerFragment :
         }
         adapter.replace(paths)
         // ViewPager only asynchronously sets current item to 0, which isn't a desirable behavior
-        // for us and will make updateTitle() crash for index out of bounds.
+        // for us and would leave currentItem out of bounds for currentPath.
         if (binding.viewPager.currentItem > paths.lastIndex) {
             binding.viewPager.currentItem = paths.lastIndex
         }
-        updateTitle()
         // Work around blank screen due to ViewPager2.PageTransformer not being called (and thus the
         // next item keeps its 0 alpha) when we have offscreenPageLimit = 1.
         binding.viewPager.doOnPreDraw {
@@ -439,10 +477,12 @@ class MediaViewerFragment :
     }
 
     private fun showPlaybackError(path: Path, error: PlaybackException) {
-        val videoBinding = currentVideoBinding ?: return
+        val holder = currentVideoHolder ?: return
+        // A pending show would otherwise put a spinner on top of the error message.
+        holder.progress.endAll()
+        val videoBinding = holder.binding
         videoBinding.playerView.isVisible = false
         videoBinding.thumbnailImage.isVisible = false
-        videoBinding.progress.fadeOutUnsafe()
         videoBinding.errorText.text = getString(
             R.string.media_viewer_playback_error_format, error.errorCodeName
         )
@@ -503,49 +543,7 @@ class MediaViewerFragment :
     private fun setPlaybackSpeed(speed: Float) {
         viewModel.playbackSpeed = speed
         playerHolder?.exoPlayer?.setPlaybackSpeed(speed)
-        updateTitle()
     }
-
-    private fun updateTitle() {
-        val path = currentPath
-        requireActivity().title = path.fileName.toString()
-        val size = paths.size
-        val countText = if (size > 1) {
-            // The key is still image_viewer_*, see plan 12 1.5.
-            getString(
-                R.string.image_viewer_subtitle_format, binding.viewPager.currentItem + 1, size
-            )
-        } else {
-            null
-        }
-        // Show the speed only when it is not 1x, see spec 11 section 6.3.
-        val speedText = if (path.isPlayableVideo && viewModel.playbackSpeed != 1f) {
-            formatPlaybackSpeed(viewModel.playbackSpeed)
-        } else {
-            null
-        }
-        binding.toolbar.subtitle = listOfNotNull(countText, speedText).joinToString("  ")
-            .ifEmpty { null }
-    }
-
-    private fun formatPlaybackSpeed(speed: Float): String =
-        when (speed) {
-            0.25f -> getString(R.string.media_viewer_speed_0_25)
-            0.5f -> getString(R.string.media_viewer_speed_0_5)
-            0.75f -> getString(R.string.media_viewer_speed_0_75)
-            1f -> getString(R.string.media_viewer_speed_1)
-            1.5f -> getString(R.string.media_viewer_speed_1_5)
-            2f -> getString(R.string.media_viewer_speed_2)
-            // PlayerControlView has a speed menu of its own with values we do not offer.
-            else -> getString(
-                R.string.media_viewer_speed_format,
-                if (speed == speed.toInt().toFloat()) {
-                    speed.toInt().toString()
-                } else {
-                    speed.toString()
-                }
-            )
-        }
 
     private fun share() {
         val path = currentPath

@@ -18,7 +18,7 @@
         android:visibility="gone"
         app:use_controller="false"
         app:surface_type="texture_view"
-        app:show_buffering="when_playing"
+        app:show_buffering="never"
         app:resize_mode="fit" />
 
     <!-- Above the player on purpose, see plan 12 2.3.1. -->

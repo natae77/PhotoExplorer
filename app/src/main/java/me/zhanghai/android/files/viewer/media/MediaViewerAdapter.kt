@@ -90,7 +90,7 @@ class MediaViewerAdapter(
         val path = getItem(position)
         when (holder) {
             is ImageViewHolder -> bindImage(holder.binding, path)
-            is VideoViewHolder -> bindVideo(holder.binding, path)
+            is VideoViewHolder -> bindVideo(holder, path)
             else -> throw IllegalStateException(holder.toString())
         }
     }
@@ -104,6 +104,8 @@ class MediaViewerAdapter(
                 holder.binding.largeImage.recycle()
             }
             is VideoViewHolder -> {
+                // Otherwise a pending show would fire on the recycled page.
+                holder.progress.endAll()
                 holder.binding.thumbnailImage.dispose()
                 // The player is detached by the fragment, not here.
             }
@@ -117,7 +119,8 @@ class MediaViewerAdapter(
         loadImage(binding, path)
     }
 
-    private fun bindVideo(binding: MediaViewerVideoItemBinding, path: Path) {
+    private fun bindVideo(holder: VideoViewHolder, path: Path) {
+        val binding = holder.binding
         binding.root.reset()
         binding.root.setOnClickListener(listener)
         binding.playerView.isVisible = false
@@ -127,7 +130,7 @@ class MediaViewerAdapter(
         binding.thumbnailImage.animate().cancel()
         binding.thumbnailImage.isVisible = true
         binding.thumbnailImage.alpha = 1f
-        binding.progress.fadeInUnsafe(true)
+        holder.progress.begin(DelayedProgress.Reason.THUMBNAIL)
         lifecycleOwner.lifecycleScope.launch {
             val attributes = try {
                 withContext(Dispatchers.IO) {
@@ -135,15 +138,15 @@ class MediaViewerAdapter(
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
-                binding.progress.fadeOutUnsafe()
+                holder.progress.end(DelayedProgress.Reason.THUMBNAIL)
                 return@launch
             }
             binding.thumbnailImage.load(path to attributes) {
                 size(Size.ORIGINAL)
                 fadeIn(binding.thumbnailImage.context.shortAnimTime)
                 listener(
-                    onSuccess = { _, _ -> binding.progress.fadeOutUnsafe() },
-                    onError = { _, _ -> binding.progress.fadeOutUnsafe() }
+                    onSuccess = { _, _ -> holder.progress.end(DelayedProgress.Reason.THUMBNAIL) },
+                    onError = { _, _ -> holder.progress.end(DelayedProgress.Reason.THUMBNAIL) }
                 )
             }
         }
@@ -277,7 +280,10 @@ class MediaViewerAdapter(
         RecyclerView.ViewHolder(binding.root)
 
     class VideoViewHolder(val binding: MediaViewerVideoItemBinding) :
-        RecyclerView.ViewHolder(binding.root)
+        RecyclerView.ViewHolder(binding.root) {
+        /** Thumbnail loading and buffering share one indicator, see spec 11a section 6.1. */
+        val progress = DelayedProgress(binding.progress)
+    }
 
     private class ImageInfo(
         val attributes: BasicFileAttributes,

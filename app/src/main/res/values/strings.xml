@@ -707,7 +707,6 @@
     <string name="media_viewer_speed_1">1\u00d7</string>
     <string name="media_viewer_speed_1_5">1.5\u00d7</string>
     <string name="media_viewer_speed_2">2\u00d7</string>
-    <string name="media_viewer_speed_format">%1$s\u00d7</string>
     <string name="media_viewer_details">Details</string>
     <string name="media_viewer_details_file_name">File name</string>
     <string name="media_viewer_details_created_time">Date taken</string>
