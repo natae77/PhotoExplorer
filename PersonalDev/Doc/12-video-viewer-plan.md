@@ -1,6 +1,7 @@
 # 12. 동영상 뷰어 구현 계획서
 
 [11번 기획서](11-video-viewer-spec.md)를 어떻게 만들 것인가.
+**10단계만은 [11a번 기획서](11a-viewer-ui-cleanup-spec.md)** 를 따른다.
 
 - 작성일: 2026-08-28
 - 프로젝트: **PhotoExplorer** (`natae77/PhotoExplorer`, `zhanghai/MaterialFiles` fork)
@@ -49,6 +50,7 @@
 | 7 | 세부 정보 오버레이 | `⋮` → 세부 정보 | §7 | ✅ 2026-08-28 |
 | 8 | 오류 처리 · 공유 MIME · 삭제 안전 | 못 여는 코덱에서 안내 문구 | §8, §9 | ✅ 2026-08-28 |
 | 9 | 검증 · 실기기 측정 | — | §11, §12 | ✅ 2026-08-28 — 에뮬레이터 + 실기기(SM-F971N). 11번 §11의 2·5번만 남음 |
+| 10 | **화면 정리** — 검정 판 제거 · 컨트롤 손보기 | 사진/영상이 화면을 다 쓰고, 조작 요소만 얹힌다 | **11a 전체** | ✅ 2026-08-29 — 에뮬레이터 + 실기기(SM-F971N, release/R8) |
 
 **구현하면서 계획과 달라진 곳** — 전부 에뮬레이터에서 돌려 보고 고친 것이다.
 계획 본문은 그대로 두고(끝난 단계는 고치지 않는다) 여기에만 적는다.
@@ -61,6 +63,10 @@
 | 4 | 4단계 §4.3 — 컨트롤 표시를 `SystemUiHelper` 콜백과 `onPageSelected`에서 갱신 | **`onViewStateRestored()`에서도 한 번 부른다.** 콜백을 `setCurrentItem()` **뒤에** 등록하므로 첫 페이지에는 `onPageSelected()`가 오지 않는다 — 기존 코드가 `updateTitle()`을 여기서 부르는 이유와 같다. 없으면 **동영상을 눌러 들어간 첫 화면에 슬라이더가 안 뜬다** |
 | 5 | 6단계 — 배속은 `⋮` 메뉴로만 바뀐다 | **`onPlaybackParametersChanged`로 되받는다.** `PlayerControlView`의 기본 컨트롤에는 톱니바퀴(설정) → 속도 메뉴가 딸려 있고, 거기에는 우리가 안 쓰는 1.25×도 있다. 되받지 않으면 부제목과 라디오 표시가 실제 속도와 어긋난다. 목록에 없는 값은 `media_viewer_speed_format`(`%1$s×`)로 표시한다 |
 | 6 | 2단계 §2.4 — `bindVideo()`가 썸네일을 `isVisible = true`로 되돌린다 | **`animate().cancel()`과 `alpha = 1f`도 같이.** 첫 프레임에서 건 페이드아웃 애니메이션이 아직 돌고 있을 수 있다 |
+| 7 | 10단계 §10.3.1 — 되감기/빨리감기를 `ImageButton` + `ExoStyledControls.Button.Center.Rewind`/`.Ffwd`로 | **`Button` + `.RewWithAmount`/`.FfwdWithAmount`, id도 `exo_rew_with_amount`/`exo_ffwd_with_amount`.** aar을 열어 보니 계획서에 적은 이름이 1.11.0에 없다. 실제 스타일은 `TextView` 계열이고 초 수(`10`)를 글자로 그린다 |
+| 8 | 10단계 §10.1 — 버튼 배경으로 `media_viewer_control_background.xml`(원 + 리플)을 준다 | **드로어블을 만들지 않고, 버튼마다 `FrameLayout` 래퍼에 원 스크림을 깔았다.** `RewWithAmount`/`FfwdWithAmount`는 **아이콘을 `android:background`에, 리플을 `android:foreground`에** 갖고 있다. 배경을 덮어쓰면 아이콘이 지워진다 |
+| 9 | 10단계 §10.3.1 — `paddingHorizontal` · `layout_marginHorizontal` | **`paddingStart/End` · `layout_marginStart/End`.** 앞엣것들은 API 26+인데 이 앱은 `minSdk 23`이다 |
+| 10 | 10단계 §10.6 — `image_viewer_subtitle_format`을 지운다 | **지우지 않았다.** upstream 문자열이고 **31개 로케일에 번역이 들어 있다.** 지우면 번역 파일 31개를 건드리게 되고 upstream 병합만 어려워진다. 우리가 만든 `media_viewer_speed_format`만 지웠다 |
 
 **상태 칸은 착수하면서 만든다.** 09번처럼 단계마다 갱신하고, **끝난 단계는 나중에 기획이
 바뀌어도 본문을 고치지 않는다** — 대신 뒤에 새 단계를 붙인다.
@@ -81,6 +87,12 @@
 | `viewer/media/VideoDetails.kt` | 오버레이에 뿌릴 값 묶음 + 만드는 함수 (§7.2) |
 | `res/layout/media_viewer_video_item.xml` | 동영상 페이지 (§4.3) |
 | `res/layout/video_details_dialog.xml` | 세부 정보 시트 |
+| `viewer/media/ScrimmedIcon.kt` | 앱 바 아이콘 뒤에 원 스크림을 씌우는 확장 함수 하나 (10단계, 11a §3.3) |
+| `viewer/media/DelayedProgress.kt` | 페이지 하나의 로딩 표시 — 두 이유를 모아 0.5초 지연 (10단계, 11a §6.1) |
+| `res/layout/media_viewer_player_control.xml` | 하단 컨트롤 레이아웃 (10단계, 11a §4) |
+| `res/drawable/media_viewer_scrim_circle.xml` | 아이콘 뒤 원 (10단계) |
+| `res/drawable/media_viewer_scrim_rect.xml` | 시간 텍스트 뒤 라운드 사각 (10단계) |
+| `res/drawable/media_viewer_control_background.xml` | 재생 버튼 배경 — 원 스크림 + 리플 (10단계) |
 
 **이름만 바뀜 (1단계)**
 
@@ -106,6 +118,10 @@
 | `filelist/FileListFragment.kt` | 뷰어 목록에 동영상 포함, 진입 분기 (2단계) |
 | `res/values/strings.xml`, `res/values-ko/strings.xml` | 제목 변경 + 새 문자열 |
 | `util/IntentExtensions.kt` 사용처 | 공유 MIME (8단계) |
+| `res/layout/media_viewer_fragment.xml` | 앱 바 배경 투명, 컨트롤 레이아웃 교체 (10단계) |
+| `res/layout/media_viewer_video_item.xml` | `show_buffering="never"` (10단계) |
+| `viewer/media/MediaViewerFragment.kt` | 제목 제거, 아이콘 스크림, 버퍼링 표시 연결 (10단계) |
+| `viewer/media/MediaViewerAdapter.kt` | 썸네일 로딩 표시를 `DelayedProgress`로 (10단계) |
 
 ## 3. 전역 제약
 
@@ -2271,6 +2287,769 @@ JAVA_HOME="/c/Program Files/Android/Android Studio/jbr" ./gradlew assembleReleas
 
 ---
 
+## 10단계. 화면 정리 — 검정 판 제거 · 컨트롤 손보기
+
+기준은 [11a번 기획서](11a-viewer-ui-cleanup-spec.md)다. 9단계까지와 달리 **기능을 더하지 않고 덜어낸다.**
+
+### 10.0 이 단계가 되돌리는 것
+
+이 단계는 앞 단계에서 만든 것 셋을 **의도적으로 되돌린다.** 끝난 단계의 본문은 고치지 않는 것이
+이 문서의 규칙이므로(§1), 무엇이 뒤집히는지 여기에 모아 둔다.
+
+| 되돌리는 것 | 어디서 만들었나 | 왜 |
+|---|---|---|
+| 앱 바 부제목의 배속 표시 | 6단계 §6.4 | 부제목이 통째로 없어진다 (11a §3.2, D15) |
+| `PlayerControlView`의 `minHeight="220dp"` | §1 "달라진 곳" 2번 | 우리 레이아웃에는 minimal mode가 없으므로 이 방어가 필요 없다 (11a §4.1) |
+| Media3 기본 컨트롤 레이아웃을 그대로 쓰기 | 4단계 §4.1 | 스크림과 톱니바퀴가 레이아웃에 박혀 있어 속성으로 못 뗀다 (11a D17) |
+
+**뒤집히지 않는 것**: 컨트롤의 동작 로직은 여전히 Media3 것이다. 우리는 레이아웃만 갈아끼운다.
+`show_timeout="0"`(자동 숨김 끄기), 앱 바와 함께 여닫기, 스크러빙은 그대로다.
+
+### 10.1 스크림 드로어블부터 만든다
+
+10.2와 10.3이 둘 다 이걸 쓴다. 색은 **이미 있는 `@color/dark_50_percent`를 그대로 쓴다.**
+새 색을 만들지 않는다 (11a §3.3).
+
+- [ ] `res/drawable/media_viewer_scrim_circle.xml` — 아이콘 뒤에 깔 원
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+
+<shape
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+
+    <solid android:color="@color/dark_50_percent" />
+</shape>
+```
+
+- [ ] `res/drawable/media_viewer_scrim_rect.xml` — 시간 텍스트 뒤에 깔 라운드 사각
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+
+<shape
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+
+    <solid android:color="@color/dark_50_percent" />
+    <corners android:radius="4dp" />
+</shape>
+```
+
+- [ ] `res/drawable/media_viewer_control_background.xml` — 재생 버튼 배경. 원 스크림 **위에**
+      리플이 도는 형태다. 배경을 그냥 원으로 주면 눌린 느낌이 사라진다.
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+
+<ripple
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="?attr/colorControlHighlight">
+
+    <item android:id="@android:id/mask">
+        <shape android:shape="oval">
+            <solid android:color="@android:color/white" />
+        </shape>
+    </item>
+
+    <item android:drawable="@drawable/media_viewer_scrim_circle" />
+</ripple>
+```
+
+### 10.2 상단 앱 바 — 배경과 글자를 없애고 아이콘에 원을 깐다
+
+#### 10.2.1 배경 지우기
+
+- [ ] `res/layout/media_viewer_fragment.xml`의 `appBarLayout` 배경을 투명으로.
+
+```xml
+    <FrameLayout
+        android:id="@+id/appBarLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@android:color/transparent">
+```
+
+이 배경이 상태바 자리까지 그리고 있었다(`MediaViewerFragment.onActivityCreated()`의
+"Our app bar will draw the status bar background" 주석). `statusBarColor`는 이미
+`TRANSPARENT`이므로 **이제 상태바 자리까지 사진이 올라온다.** 의도한 결과다.
+
+⚠️ **`applySystemWindowInsetsToPadding()` 호출은 지우지 않는다.** 지우면 아이콘이 상태바와
+노치 밑으로 들어간다. 인셋은 그대로, 배경만 없앤다.
+
+#### 10.2.2 제목·부제목 없애기
+
+- [ ] `onActivityCreated()`에서 액션바가 제목을 그리지 않게 한다. **이 줄이 없으면
+      매니페스트의 액티비티 라벨("미디어 뷰어")이 제목 자리에 그대로 뜬다.**
+
+```kotlin
+        val activity = activity as AppCompatActivity
+        activity.setSupportActionBar(binding.toolbar)
+        activity.supportActionBar!!.apply {
+            setDisplayHomeAsUpEnabled(true)
+            // The app bar has no background any more, so it shows nothing but its two icons.
+            // See spec 11a section 3.2.
+            setDisplayShowTitleEnabled(false)
+        }
+```
+
+- [ ] `updateTitle()` 함수를 **통째로 지운다** (현재 509~529행).
+
+- [ ] 호출처를 전부 지운다. 다섯 곳이다.
+
+| 위치 | 지금 | 뒤 |
+|---|---|---|
+| `onPageSelected()` (153행) | `updateTitle()` | 줄 삭제 |
+| `onPlaybackParametersChanged()` (322행) | `updateTitle()` | 줄 삭제 |
+| `onViewStateRestored()` (346행) | `updateTitle()` | 줄 삭제 |
+| 삭제 처리 (431행) | `updateTitle()` | 줄 삭제 |
+| `setPlaybackSpeed()` (506행) | `updateTitle()` | 줄 삭제 |
+
+- [ ] 431행 위의 주석은 **`updateTitle()`을 가리키므로 함께 고친다.** 인덱스 보정 자체는
+      남겨 둔다 — 지우면 `currentPath`가 범위를 벗어난다.
+
+```kotlin
+        // ViewPager only asynchronously sets current item to 0, which isn't a desirable behavior
+        // for us and would leave currentItem out of bounds for currentPath.
+        if (binding.viewPager.currentItem > paths.lastIndex) {
+            binding.viewPager.currentItem = paths.lastIndex
+        }
+```
+
+- [ ] `onViewStateRestored()`에 남은 주석도 손본다. `updatePlayerControlVisibility()`는
+      **그대로 둔다** — 첫 페이지에 슬라이더가 안 뜨는 문제(§1 "달라진 곳" 4번)는 여전하다.
+
+```kotlin
+        // onPageSelected() never fires for the initial page because the callback is registered
+        // after setCurrentItem().
+        updatePlayerControlVisibility()
+```
+
+#### 10.2.3 아이콘에 원 스크림 씌우기
+
+배경 판이 없어졌으니 흰 아이콘이 밝은 사진 위에서 사라진다. **테마가 고른 아이콘을 그대로 두고
+뒤에 원만 깐다.** 아이콘 파일을 새로 만들지 않는 이유는, 뒤로가기 아이콘이 테마의
+`homeAsUpIndicator`에서 오기 때문이다 — 우리가 어떤 벡터가 쓰이는지 정하지 않는다.
+
+- [ ] `app/src/main/java/me/zhanghai/android/files/viewer/media/ScrimmedIcon.kt` (신규)
+
+```kotlin
+/*
+ * Copyright (c) 2026 PhotoExplorer
+ * All Rights Reserved.
+ */
+
+package me.zhanghai.android.files.viewer.media
+
+import android.content.Context
+import android.graphics.drawable.Drawable
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.LayerDrawable
+import me.zhanghai.android.files.R
+import me.zhanghai.android.files.util.dpToDimensionPixelSize
+
+private const val SCRIM_SIZE_DP = 40
+private const val ICON_SIZE_DP = 24
+
+/**
+ * Puts a translucent disc behind an app bar icon, see spec 11a section 3.3.
+ *
+ * The app bar has no background of its own any more, so a white icon disappears over a bright
+ * photo. Wrapping keeps whatever icon the theme picked instead of hard coding one of ours.
+ */
+fun Drawable.withCircleScrim(context: Context): Drawable {
+    val scrimSize = context.dpToDimensionPixelSize(SCRIM_SIZE_DP)
+    val inset = (scrimSize - context.dpToDimensionPixelSize(ICON_SIZE_DP)) / 2
+    val scrim = GradientDrawable().apply {
+        shape = GradientDrawable.OVAL
+        setColor(context.getColor(R.color.dark_50_percent))
+        setSize(scrimSize, scrimSize)
+    }
+    return LayerDrawable(arrayOf(scrim, this)).apply { setLayerInset(1, inset, inset, inset, inset) }
+}
+```
+
+`LayerDrawable`의 고유 크기는 각 층의 고유 크기에 인셋을 더한 것 중 **가장 큰 값**이다.
+원이 40dp, 아이콘이 24dp + 좌우 8dp = 40dp라서 결과도 40dp가 된다.
+
+- [ ] 뒤로가기 아이콘에 씌운다. `setDisplayHomeAsUpEnabled(true)` **뒤에** 놓아야 한다.
+      그 전에는 `navigationIcon`이 아직 `null`이다.
+
+```kotlin
+        binding.toolbar.navigationIcon =
+            binding.toolbar.navigationIcon?.withCircleScrim(requireContext())
+```
+
+- [ ] `⋮` 아이콘은 `onPrepareOptionsMenu()`(현재 364행)에서 씌운다. **메뉴가 만들어진 뒤에야
+      `overflowIcon`이 생긴다.** 이 콜백은 `invalidateOptionsMenu()`마다 다시 불리므로,
+      **한 번만 씌우도록 막지 않으면 원이 겹겹이 쌓인다.**
+
+```kotlin
+    private var isOverflowIconScrimmed = false
+
+    override fun onPrepareOptionsMenu(menu: Menu) {
+        super.onPrepareOptionsMenu(menu)
+
+        if (!isOverflowIconScrimmed) {
+            val overflowIcon = binding.toolbar.overflowIcon
+            if (overflowIcon != null) {
+                binding.toolbar.overflowIcon = overflowIcon.withCircleScrim(requireContext())
+                isOverflowIconScrimmed = true
+            }
+        }
+        // ... 기존 내용은 그대로
+    }
+```
+
+`isOverflowIconScrimmed`는 뷰가 아니라 프래그먼트가 들고 있으므로 화면 회전 뒤에도
+살아 있다. 회전하면 뷰가 새로 만들어지면서 아이콘도 원래대로 돌아오므로,
+`onDestroyView()`에서 `false`로 되돌린다.
+
+- [ ] `onDestroyView()`에 한 줄 더한다.
+
+```kotlin
+    override fun onDestroyView() {
+        super.onDestroyView()
+
+        playerHolder?.release()
+        playerHolder = null
+        // The new view will get a fresh, unwrapped overflow icon.
+        isOverflowIconScrimmed = false
+    }
+```
+
+### 10.3 하단 컨트롤 — 우리 레이아웃으로 갈아끼운다
+
+#### 10.3.1 컨트롤 레이아웃 (신규)
+
+`PlayerControlView`는 **뷰를 id로 찾는다.** 그래서 우리 레이아웃도 Media3의 id를 그대로 써야
+한다. `@+id`가 아니라 **`@id`** 로 참조한다 — 새로 만드는 id가 아니라 Media3의 것이다.
+
+- [ ] `res/layout/media_viewer_player_control.xml` (신규)
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+  ~ Copyright (c) 2026 PhotoExplorer
+  ~ All Rights Reserved.
+  -->
+
+<!--
+  ~ Replaces the Media3 default layout, which bakes in a full width scrim and a settings button.
+  ~ See spec 11a section 4. The behaviour still comes from PlayerControlView; only the views are
+  ~ ours, and they keep Media3's ids so it can find them.
+  -->
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingHorizontal="8dp"
+    android:paddingVertical="8dp">
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:orientation="horizontal">
+
+        <ImageButton
+            android:id="@id/exo_rew"
+            style="@style/ExoStyledControls.Button.Center.Rewind"
+            android:background="@drawable/media_viewer_control_background" />
+
+        <ImageButton
+            android:id="@id/exo_play_pause"
+            style="@style/ExoStyledControls.Button.Center.PlayPause"
+            android:layout_marginHorizontal="16dp"
+            android:background="@drawable/media_viewer_control_background" />
+
+        <ImageButton
+            android:id="@id/exo_ffwd"
+            style="@style/ExoStyledControls.Button.Center.FfwdWithAmount"
+            android:background="@drawable/media_viewer_control_background" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@id/exo_position"
+            style="@style/ExoStyledControls.TimeText.Position"
+            android:background="@drawable/media_viewer_scrim_rect"
+            android:paddingHorizontal="6dp"
+            android:paddingVertical="2dp" />
+
+        <androidx.media3.ui.DefaultTimeBar
+            android:id="@id/exo_progress"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginHorizontal="8dp"
+            app:touch_target_height="39dp" />
+
+        <TextView
+            android:id="@id/exo_duration"
+            style="@style/ExoStyledControls.TimeText.Duration"
+            android:background="@drawable/media_viewer_scrim_rect"
+            android:paddingHorizontal="6dp"
+            android:paddingVertical="2dp" />
+    </LinearLayout>
+</LinearLayout>
+```
+
+**여기 없는 것이 곧 없어지는 것이다** — 스크림 배경 뷰, 톱니바퀴(`exo_settings`),
+이전/다음, 셔플·반복·자막·VR·전체화면. `PlayerControlView`는 없는 id를 조용히 건너뛴다.
+
+**오디오는 이 레이아웃에서 톱니바퀴가 빠지는 것으로 끝난다 (11a §4.3).** 트랙 선택 UI가
+없어질 뿐이고, ExoPlayer의 기본 트랙 선택이 그대로 동작한다. **코드로 할 일이 없다** —
+`TrackSelectionParameters`를 건드리지 않는다.
+
+⚠️ **`@style/ExoStyledControls.*` 이름이 1.11.0에서 안 맞으면 빌드가 바로 깨진다.**
+그때는 스타일을 빼고 아이콘을 직접 준다 — `exo_rew`에 `android:src="@drawable/exo_icon_rewind"`,
+`exo_ffwd`에 `@drawable/exo_icon_fastforward`. `exo_play_pause`는 **아이콘을 주지 않아도 된다**:
+`PlayerControlView`가 재생/일시정지 상태에 맞춰 직접 넣는다.
+
+#### 10.3.2 프래그먼트 레이아웃에서 갈아끼우기
+
+- [ ] `res/layout/media_viewer_fragment.xml`의 `PlayerControlView`를 이렇게 바꾼다.
+
+```xml
+    <androidx.media3.ui.PlayerControlView
+        android:id="@+id/playerControlView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:visibility="gone"
+        app:controller_layout_id="@layout/media_viewer_player_control"
+        app:show_timeout="0" />
+```
+
+바뀐 곳은 셋이다.
+
+- `app:controller_layout_id` **추가** — 우리 레이아웃을 쓴다
+- `android:minHeight="220dp"` **삭제** — minimal mode 방어였는데, 우리 레이아웃에는
+  minimal mode 자체가 없다 (§10.0)
+- `show_previous_button` 등 다섯 개 **삭제** — 그 뷰들이 레이아웃에 아예 없으므로 끌 것이 없다
+
+`show_timeout="0"`은 **남긴다.** 자동 숨김을 끄는 것이고, 앱 바와 함께 여닫는 규칙(11번 §6.2)이
+여기에 걸려 있다.
+
+`applySystemWindowInsetsToPadding()` 호출도 **그대로 둔다.** 제스처 바 위로 올라와야 한다.
+
+### 10.4 슬라이더 터치 판정 1.5배
+
+10.3.1 레이아웃의 `app:touch_target_height="39dp"` 한 줄이 전부다.
+
+| 항목 | 값 | 왜 |
+|---|---|---|
+| `touch_target_height` | **39dp** | Media3 기본값 26dp × 1.5 (11a §5) |
+| `bar_height` | 주지 않는다 | 막대 두께는 그대로 |
+| `scrubber_enabled_size` / `scrubber_dragged_size` | 주지 않는다 | **동그라미 크기는 그대로** |
+
+`android:layout_height`를 `wrap_content`로 둔 것이 중요하다. `DefaultTimeBar`는
+`touch_target_height`를 자기 높이로 잡는다. 고정 높이를 주면 판정 영역이 잘린다.
+
+### 10.5 로딩 표시를 하나로 합치고 지연시킨다
+
+#### 10.5.1 ⚠️ 지금 스피너는 **버퍼링용이 아니다**
+
+`media_viewer_video_item.xml`의 `progress`는 **썸네일 로딩용**이다
+(`MediaViewerAdapter.bindVideo()`가 켜고 끈다). 버퍼링 표시는 `PlayerView`가
+`show_buffering="when_playing"`으로 **따로 그린다.** 즉 넘길 때 도는 원의 출처가 둘이다.
+하나만 지연시키면 다른 하나가 그대로 깜빡인다 (11a §6.1).
+
+**둘을 한 뷰로 모으고, 그 뷰를 지연시킨다.**
+
+⚠️ **사진 페이지는 손대지 않는다 (11a §6.2, D18).** `bindImage()`, `loadImage()`,
+`loadImageWithInfo()`, `showError()`의 `binding.progress` 호출은 **지금 그대로 둔다.**
+`media_viewer_image_item.xml`도 건드리지 않는다. 이 절의 변경은 전부 동영상 쪽이다.
+
+#### 10.5.2 지연 표시기 (신규)
+
+- [ ] `app/src/main/java/me/zhanghai/android/files/viewer/media/DelayedProgress.kt` (신규)
+
+```kotlin
+/*
+ * Copyright (c) 2026 PhotoExplorer
+ * All Rights Reserved.
+ */
+
+package me.zhanghai.android.files.viewer.media
+
+import android.os.Handler
+import android.os.Looper
+import android.view.View
+import me.zhanghai.android.files.util.fadeInUnsafe
+import me.zhanghai.android.files.util.fadeOutUnsafe
+
+private const val DELAY_MILLIS = 500L
+
+/**
+ * Shows [view] only when the wait actually lasts, see spec 11a section 6.1.
+ *
+ * A video page waits for two things that overlap: its thumbnail and the player's buffering. Both
+ * report here, and the indicator stays up until both are done, so a finished thumbnail cannot hide
+ * a still buffering player.
+ */
+class DelayedProgress(private val view: View) {
+    enum class Reason { THUMBNAIL, BUFFERING }
+
+    private val handler = Handler(Looper.getMainLooper())
+    private val reasons = mutableSetOf<Reason>()
+    private val showRunnable = Runnable { view.fadeInUnsafe(true) }
+
+    fun begin(reason: Reason) {
+        // Already waiting: the pending show still covers this reason.
+        if (!reasons.add(reason) || reasons.size > 1) {
+            return
+        }
+        handler.postDelayed(showRunnable, DELAY_MILLIS)
+    }
+
+    fun end(reason: Reason) {
+        if (!reasons.remove(reason) || reasons.isNotEmpty()) {
+            return
+        }
+        hide()
+    }
+
+    /** For recycling and errors, when neither reason is worth tracking any more. */
+    fun endAll() {
+        reasons.clear()
+        hide()
+    }
+
+    private fun hide() {
+        handler.removeCallbacks(showRunnable)
+        view.fadeOutUnsafe()
+    }
+}
+```
+
+#### 10.5.3 어댑터 — 썸네일 쪽을 옮긴다
+
+- [ ] `VideoViewHolder`가 표시기를 들게 한다.
+
+```kotlin
+    class VideoViewHolder(val binding: MediaViewerVideoItemBinding) :
+        RecyclerView.ViewHolder(binding.root) {
+        val progress = DelayedProgress(binding.progress)
+    }
+```
+
+- [ ] `onBindViewHolder()`가 `binding`이 아니라 **홀더**를 넘기게 한다.
+
+```kotlin
+            is VideoViewHolder -> bindVideo(holder, path)
+```
+
+- [ ] `bindVideo()`의 시그니처와 세 군데 호출을 바꾼다.
+
+```kotlin
+    private fun bindVideo(holder: VideoViewHolder, path: Path) {
+        val binding = holder.binding
+        binding.root.reset()
+        binding.root.setOnClickListener(listener)
+        binding.playerView.isVisible = false
+        binding.errorLayout.isVisible = false
+        // The fragment fades the thumbnail out once the first frame is rendered, and that
+        // animation may still be running when this page comes back. See plan 12 3.3.
+        binding.thumbnailImage.animate().cancel()
+        binding.thumbnailImage.isVisible = true
+        binding.thumbnailImage.alpha = 1f
+        holder.progress.begin(DelayedProgress.Reason.THUMBNAIL)
+        lifecycleOwner.lifecycleScope.launch {
+            val attributes = try {
+                withContext(Dispatchers.IO) {
+                    path.readAttributes(BasicFileAttributes::class.java)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                holder.progress.end(DelayedProgress.Reason.THUMBNAIL)
+                return@launch
+            }
+            binding.thumbnailImage.load(path to attributes) {
+                size(Size.ORIGINAL)
+                fadeIn(binding.thumbnailImage.context.shortAnimTime)
+                listener(
+                    onSuccess = { _, _ ->
+                        holder.progress.end(DelayedProgress.Reason.THUMBNAIL)
+                    },
+                    onError = { _, _ ->
+                        holder.progress.end(DelayedProgress.Reason.THUMBNAIL)
+                    }
+                )
+            }
+        }
+    }
+```
+
+- [ ] `onViewRecycled()`에서 예약을 취소한다. **없으면 재활용된 페이지에서 스피너가 뒤늦게 뜬다.**
+
+```kotlin
+    override fun onViewRecycled(holder: RecyclerView.ViewHolder) {
+        ...
+        when (holder) {
+            is VideoViewHolder -> {
+                holder.progress.endAll()
+                holder.binding.thumbnailImage.dispose()
+            }
+            ...
+        }
+    }
+```
+
+#### 10.5.4 재생 뷰의 자체 버퍼링 표시를 끈다
+
+- [ ] `res/layout/media_viewer_video_item.xml`의 `PlayerView`에서 한 줄을 바꾼다.
+
+```xml
+        app:show_buffering="never"
+```
+
+#### 10.5.5 프래그먼트 — 버퍼링 쪽을 표시기에 연결한다
+
+프래그먼트는 지금 `videoBindingAt()`으로 **바인딩만** 꺼낸다. 표시기는 홀더에 있으므로
+**홀더를 꺼내도록 바꾸고, 바인딩은 홀더에서 얻는다.**
+
+- [ ] 275~290행의 두 접근자를 이렇게 바꾼다.
+
+```kotlin
+    private val currentVideoHolder: MediaViewerAdapter.VideoViewHolder?
+        get() = videoHolderAt(binding.viewPager.currentItem)
+
+    private val currentVideoBinding: MediaViewerVideoItemBinding?
+        get() = currentVideoHolder?.binding
+
+    private fun videoHolderAt(position: Int): MediaViewerAdapter.VideoViewHolder? {
+        val recyclerView = binding.viewPager.getChildAt(0) as? RecyclerView ?: return null
+        val holder = recyclerView.findViewHolderForAdapterPosition(position)
+        return holder as? MediaViewerAdapter.VideoViewHolder
+    }
+```
+
+`videoBindingAt(position)`을 쓰던 `restoreVideoPage()`(229행)도 홀더로 바꾼다. 떠나는 페이지의
+**버퍼링 예약도 여기서 취소해야 한다** — 그러지 않으면 이미 떠난 페이지에 스피너가 뜬다.
+
+- [ ] `restoreVideoPage()`를 이렇게 바꾼다.
+
+```kotlin
+    private fun restoreVideoPage(path: Path) {
+        val position = paths.indexOf(path)
+        if (position == -1) {
+            return
+        }
+        val holder = videoHolderAt(position) ?: return
+        holder.progress.end(DelayedProgress.Reason.BUFFERING)
+        val videoBinding = holder.binding
+        videoBinding.playerView.isVisible = false
+        videoBinding.thumbnailImage.animate().cancel()
+        videoBinding.thumbnailImage.alpha = 1f
+        videoBinding.thumbnailImage.isVisible = true
+    }
+```
+
+- [ ] `playerListener`의 `onPlaybackStateChanged()`에 버퍼링 처리를 넣는다.
+
+```kotlin
+        override fun onPlaybackStateChanged(playbackState: Int) {
+            updateBufferingProgress(playbackState)
+            if (playbackState == Player.STATE_READY) {
+                // videoFormat and duration are known only now, see spec 11 section 7.1.
+                updateVideoDetailsSheet()
+            }
+            if (playbackState == Player.STATE_ENDED) {
+                // Otherwise coming back to this video would start it at its last frame.
+                playerHolder?.currentPath?.let { viewModel.playbackPositions.remove(it) }
+            }
+        }
+```
+
+- [ ] 그 아래에 함수를 더한다. **화면에 있는 페이지가 실제로 재생 중인 그 페이지일 때만** 손댄다
+      — `onPlayerError()`가 쓰는 것과 같은 방어다 (§8.1.1).
+
+```kotlin
+    /** Only the page that owns the player may show its buffering, see spec 11a section 6.1. */
+    private fun updateBufferingProgress(playbackState: Int) {
+        if (playerHolder?.currentPath != currentPath) {
+            return
+        }
+        val holder = currentVideoHolder ?: return
+        if (playbackState == Player.STATE_BUFFERING) {
+            holder.progress.begin(DelayedProgress.Reason.BUFFERING)
+        } else {
+            holder.progress.end(DelayedProgress.Reason.BUFFERING)
+        }
+    }
+```
+
+- [ ] `showPlaybackError()`(현재 442행)에서 `videoBinding.progress.fadeOutUnsafe()`를
+      표시기 쪽으로 바꾼다. **직접 숨기면 예약된 표시가 살아 있어 오류 문구 위에 스피너가 뜬다.**
+
+```kotlin
+    private fun showPlaybackError(path: Path, error: PlaybackException) {
+        val holder = currentVideoHolder ?: return
+        holder.progress.endAll()
+        val videoBinding = holder.binding
+        videoBinding.playerView.isVisible = false
+        videoBinding.thumbnailImage.isVisible = false
+        // ... 나머지는 그대로
+```
+
+### 10.6 안 쓰게 되는 코드와 문자열 지우기
+
+`updateTitle()`을 지우면 딸린 것들이 함께 죽는다. **남겨 두면 다음 사람이 "왜 안 쓰지?"를
+다시 조사한다.**
+
+- [ ] `formatPlaybackSpeed()`(531~545행)를 지운다. `updateTitle()`이 유일한 호출처였다.
+- [ ] `res/values/strings.xml`과 `res/values-ko/strings.xml`에서 두 문자열을 지운다.
+
+| 문자열 | 쓰이던 곳 |
+|---|---|
+| `image_viewer_subtitle_format` | `updateTitle()`의 `3 / 20` |
+| `media_viewer_speed_format` | `formatPlaybackSpeed()`의 "목록에 없는 배속" |
+
+`media_viewer_speed_0_25` ~ `media_viewer_speed_2`는 **지우지 않는다.** `⋮` 메뉴가 쓴다.
+
+- [ ] `onPlaybackParametersChanged()`의 주석을 고친다. 톱니바퀴가 없어졌으니 "PlayerControlView에
+      자체 속도 메뉴가 있다"는 이유가 더는 맞지 않는다. **콜백 자체는 남긴다** — `ViewModel`의
+      값과 실제 속도를 맞춰 두는 값이 있다.
+
+```kotlin
+        override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
+            // Our own menu is the only way to change this now, but keeping our copy in sync keeps
+            // the checked menu item honest and stops the next video from reverting the speed.
+            if (playbackParameters.speed != viewModel.playbackSpeed) {
+                viewModel.playbackSpeed = playbackParameters.speed
+                requireActivity().invalidateOptionsMenu()
+            }
+        }
+```
+
+- [ ] 안 쓰는 import를 정리한다. `updateTitle()`과 `formatPlaybackSpeed()`가 사라지면서
+      `R.string.image_viewer_subtitle_format`·`R.string.media_viewer_speed_format` 참조가 없어진다.
+      **Android Studio의 "Optimize Imports"를 돌리지 말고**(파일 전체가 흔들린다)
+      빌드 경고에 뜬 것만 지운다.
+
+`MediaViewerVideoItemBinding` import는 **남긴다** — `currentVideoBinding`이 계속 쓴다.
+
+### 10.7 10단계 검증
+
+**빌드**
+
+- [x] `./gradlew assembleDebug` 통과
+- [x] `./gradlew assembleRelease` — **R8 난독화·리소스 축소는 통과.** `packageRelease`는
+      release 키스토어가 이 기계에 없어서 실패하는데, 10단계와 무관한 기존 환경 문제다
+
+**앱 바** (11a 수용 기준 1~4)
+
+- [x] 뷰어를 열고 탭했을 때 **위쪽에 반투명 검정 판이 없다**
+- [x] **상태바 자리까지 사진이 올라온다.** 아이콘은 상태바를 침범하지 않는다
+- [x] **파일 이름·`3 / 20`·`1.5×` 가 어디에도 없다.** 매니페스트 라벨("미디어 뷰어")도 안 뜬다
+- [x] 뒤로가기와 `⋮` 뒤에 **원형 반투명 디스크**가 있고, **흰 사진 위에서도 보인다**
+- [x] `⋮`를 여러 번 여닫아도 **원이 겹쳐서 진해지지 않는다** (§10.2.3의 중복 방지)
+- [x] **화면을 돌린 뒤에도** 두 아이콘에 원이 그대로 있다
+
+**하단 컨트롤** (수용 기준 5~8)
+
+- [x] **아래쪽에 반투명 검정 판이 없다.** 컨트롤이 차지하는 높이가 눈에 띄게 줄었다
+- [x] **톱니바퀴가 없다**
+- [ ] 10초 뒤로 · 재생/일시정지 · 10초 앞으로 · 현재 위치 · 슬라이더 · 전체 길이가 **모두 있다**
+      (§1 "달라진 곳" 2번에서 한 번 사라졌던 것들이다)
+- [ ] 10초 뒤로/앞으로가 **각각 10초씩** 움직인다
+- [ ] 재생 버튼에 **원**, 시간 텍스트에 **라운드 사각**이 깔려 있다
+- [ ] 버튼을 누르면 리플이 돈다
+- [x] `⋮` → 재생 속도가 동작하고, 고른 값에 라디오 표시가 붙는다
+- [x] 컨트롤이 제스처 바에 가리지 않는다. **가로로 눕혀도** 화면 안에 있다
+
+**슬라이더** (수용 기준 9, 10)
+
+- [x] 지금보다 **눈에 띄게 잡기 쉽다.** 동그라미 크기는 그대로다
+- [ ] 드래그하면 그 지점으로 이동하고, 끄는 동안 화면이 따라 움직인다
+- [x] ⚠️ **슬라이더 근처에서 좌우로 스와이프했을 때 페이지가 넘어가는지.** 판정을 넓힌 만큼
+      `ViewPager2`가 못 받는 영역이 커졌다. 컨트롤이 떠 있을 때만 해당한다
+
+**로딩 표시** (수용 기준 11, 13)
+
+- [x] 로컬 동영상으로 넘길 때 **가운데 스피너가 뜨지 않는다.** 썸네일·버퍼링 어느 쪽으로도
+- [ ] 동영상 페이지를 빠르게 여러 번 오갈 때도 스피너가 깜빡이지 않는다
+- [ ] **큰 4K 파일이나 SAF 경로**에서는 스피너가 제대로 뜨고, 재생이 시작되면 사라진다
+- [ ] **사진 페이지의 스피너는 지금과 같다** — 바로 뜬다
+- [x] 재생할 수 없는 동영상에서 안내 문구가 뜨고, **그 위에 스피너가 남지 않는다** (수용 기준 12)
+
+**회귀** (수용 기준 14, 15)
+
+- [x] 탭하면 앱 바와 컨트롤이 **같이** 나타나고 **같이** 사라진다
+- [x] 아래로 스와이프해 닫기가 동작한다. **슬라이더를 아래로 끌 때는 닫히지 않는다**
+- [ ] 좌우 넘김, 사진 확대, `⋮` → 삭제·공유·세부 정보가 모두 그대로다
+- [x] 백그라운드에 갔다 와도 재생 위치가 유지된다
+
+#### 10.7.1 에뮬레이터 검증 결과 (2026-08-29, Pixel_8 / API 36 / 420dpi)
+
+테스트 데이터는 `/sdcard/MixTest` — 사진 7, 동영상 4, 깨진 파일 1.
+
+**확인된 것**
+
+- 슬라이더 판정 확대가 **실측으로 확인됐다.** 막대 중심에서 **45px 아래**를 눌렀더니
+  위치가 00:36 → 00:12로 이동했다. 420dpi에서 예전 판정(26dp = ±34px)이면 빗나갔을 자리다
+- 큰 파일(`IMG_6907.mov`, 138 MB)로 넘기는 **전환 도중 프레임을 잡았는데 스피너가 없다**
+- 동영상 화면 위아래의 검은 띠는 **레터박스지 우리 스크림이 아니다.**
+  1080×1920 영상이 1080×2400 화면에 들어가면 위아래 240px씩 남는데, 화면에서 잰 값과 정확히 맞는다
+
+**안 본 것** — 10초 버튼이 정확히 10초씩 가는지, 버튼 리플, 사진 페이지 스피너,
+큰 4K/SAF 파일에서 스피너가 제때 뜨는지, 사진 확대·삭제·공유.
+
+**새로 나온 문제** — 11a §7의 6번으로 적었다.
+**상태바의 시계·아이콘이 밝은 사진 위에서 흐리다.** 앱 바 배경이 상태바 자리까지
+어둡게 깔아 주던 것이 없어져서다. 몰입 모드로 들어가면 상태바도 같이 사라지므로
+**앱 바가 떠 있는 동안에만** 생긴다.
+
+#### 10.7.2 실기기 검증 결과 (2026-08-29, SM-F971N / Android 17 / 420dpi)
+
+**release 빌드를 이 저장소에서 처음 만들었다.** `signing.gradle`이 찾는 `signing.properties`가
+없어서 `packageRelease`가 막히는데, **debug 키로 서명해서 통과시켰다.** debug 키의 비밀번호는
+안드로이드가 공개해 둔 고정값이라 비밀이 아니고, 파일을 만들지 않고 환경변수로만 넘기면
+워킹트리도 그대로다.
+
+```bash
+JAVA_HOME="/c/Program Files/Android/Android Studio/jbr" STORE_FILE="C:/Users/<사용자>/.android/debug.keystore" STORE_PASSWORD="android" KEY_ALIAS="androiddebugkey" KEY_PASSWORD="android" ./gradlew assembleRelease
+```
+
+> ⚠️ **배포용이 아니다.** debug 키로 서명한 APK는 스토어에 올릴 수 없다.
+> 난독화·리소스 축소가 들어간 빌드를 기기에서 검증하는 용도다.
+
+결과: `app-release.apk` **10.9 MB**. 기존 설치(같은 debug 키)에 덮어쓰기로 들어갔다.
+
+**확인된 것** — 테스트 데이터는 기기의 `스윙` 폴더(644개).
+
+- **R8 난독화 뒤에도 하단 컨트롤이 온전하다.** 10초 뒤/앞·재생/일시정지·현재 위치·슬라이더·
+  전체 길이가 모두 살아 있다. 이번 단계에서 가장 위험했던 곳인데 통과했다
+- 상·하단 검정 판 없음, 톱니바퀴 없음, 파일 이름·개수 없음
+- **슬라이더 판정 확대가 실기기에서도 확인됐다.** 막대 중심에서 **45px 위**를 눌러
+  00:05 → 00:20으로 이동했다 (예전 판정 ±34px 밖)
+- **넘기는 전환 프레임에 스피너가 없다**
+- 시간 텍스트의 **라운드 사각 칩**이 밝은 배경 위에서 또렷하다
+
+**에뮬레이터에서 나온 상태바 문제(11a §7의 6번)는 이 기기에서 재현되지 않았다.**
+One UI가 상태바 아이콘 색을 배경에 맞춰 바꾼다 — 밝은 천장 위에서는 검은 글자,
+검은 레터박스 위에서는 흰 글자로 나온다. **AOSP 에뮬레이터 쪽 동작으로 보인다.**
+
+**안 본 것** — 아이폰 `.mov` 재생, 사진 페이지, 10초 버튼의 정확한 이동량, 버튼 리플,
+접었다 펼 때의 화면 전환.
+
+> **커밋 메시지 초안**
+> `뷰어에서 검은 배경과 안 쓰는 표시를 걷어내기`
+
+---
+
 ## 10. 예상 작업량
 
 | 단계 | 신규 파일 | 수정 파일 | 난이도 |
@@ -2285,6 +3064,7 @@ JAVA_HOME="/c/Program Files/Android/Android Studio/jbr" ./gradlew assembleReleas
 | 7 | 2 | 3 | **중상** (값 출처가 두 곳) |
 | 8 | 0 | 3 | 중 |
 | 9 | 0 | 1 (문서) | — |
+| 10 | 6 | 4 | **중** (Media3 컨트롤 레이아웃 교체가 유일한 위험) |
 
 3단계가 가장 어렵다. `ViewPager2` 안에서 현재 페이지의 뷰를 꺼내고, 페이지 전환과 생명주기가
 겹치는 순간마다 플레이어를 정확히 붙였다 떼야 한다. **버그가 나면 대부분 여기다.**
@@ -2303,3 +3083,5 @@ JAVA_HOME="/c/Program Files/Android/Android Studio/jbr" ./gradlew assembleReleas
 - **프레임 단위 이동·구간 반복** — 11번 D10
 - **자막, 음소거, 반복 재생, PIP** — 11번 §2 비목표
 - **테스트 소스셋 도입** — 이 작업 범위 밖. 검증은 수동으로 한다
+- **사진에서 파일 이름을 볼 수단** — 10단계가 앱 바 제목을 없애면서 사라진다.
+  실제로 불편한지 써 보고 별건으로 정한다 (11a §7의 1번)
