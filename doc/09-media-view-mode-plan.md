@@ -752,7 +752,7 @@ fun putValue(value: FileViewType) {
 
 - `res/menu/file_list.xml`에서 `action_view_sort_path_specific` 항목 삭제
 - `MenuBinding`의 `viewSortPathSpecificItem` 및 관련 분기 삭제
-- [`FileViewSortPathSpecificLiveData.kt`](../app/src/main/java/me/zhanghai/android/files/filelist/FileViewSortPathSpecificLiveData.kt) 및
+- `FileViewSortPathSpecificLiveData.kt` 및
   `onViewSortPathSpecificChanged()` 삭제
 - 문자열 `file_list_action_view_sort_path_specific` 제거
   (번역 파일 다수에 존재 — 미사용 문자열이라 남겨둬도 무해하나, 기본 `values/strings.xml`에서는 제거)

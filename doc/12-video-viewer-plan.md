@@ -253,7 +253,7 @@ JAVA_HOME="/c/Program Files/Android/Android Studio/jbr" ./gradlew assembleReleas
 
 ### 1.3 ⚠️ 인텐트 extra 키가 클래스 이름에서 나온다
 
-[ImageViewerActivity.kt](../app/src/main/java/me/zhanghai/android/files/viewer/image/ImageViewerActivity.kt)의
+`ImageViewerActivity.kt`의
 extra 키는 클래스 이름을 문자열로 쓴다.
 
 ```kotlin
@@ -376,7 +376,7 @@ val Path.isPlayableVideo: Boolean
 #### ⚠️ 왜 `AndroidFileTypeDetector`를 쓰지 않는가
 
 뷰어의 기존 코드는 MIME 타입을 이렇게 알아낸다
-([MediaViewerAdapter.loadImageInfo()](../app/src/main/java/me/zhanghai/android/files/viewer/image/ImageViewerAdapter.kt)).
+([MediaViewerAdapter.loadImageInfo()](../app/src/main/java/me/zhanghai/android/files/viewer/media/MediaViewerAdapter.kt)).
 
 ```kotlin
 val attributes = readAttributes(BasicFileAttributes::class.java)   // ← 파일 시스템을 읽는다
@@ -489,7 +489,7 @@ val mimeType = AndroidFileTypeDetector.getMimeType(this, attributes).asMimeType(
 
 `maybeAddMediaViewerExtras()`는 `position == -1`이면 조용히 반환한다. 그러면 인텐트에
 `extraPathList`가 없고, 프래그먼트는 `paths.isEmpty()`에서 곧바로 `finish()`한다
-([ImageViewerFragment.kt](../app/src/main/java/me/zhanghai/android/files/viewer/image/ImageViewerFragment.kt)
+(`ImageViewerFragment.kt`
 `onActivityCreated`). 사용자에게는 **누른 동영상이 아무 데서도 안 열리는** 것으로 보인다.
 
 지금까지는 이 경우가 문제가 아니었다. extra가 안 붙어도 암시적 인텐트가 남아 있어서
@@ -594,7 +594,7 @@ val mimeType = AndroidFileTypeDetector.getMimeType(this, attributes).asMimeType(
 #### ⚠️ `surface_type="texture_view"` — 이걸 `surface_view`로 두면 페이지 전환이 깨진다
 
 이 뷰어는 `DepthPageTransformer`를 쓴다
-([MediaViewerFragment](../app/src/main/java/me/zhanghai/android/files/viewer/image/ImageViewerFragment.kt),
+([MediaViewerFragment](../app/src/main/java/me/zhanghai/android/files/viewer/media/MediaViewerFragment.kt),
 [ViewPagerTransformers.kt](../app/src/main/java/me/zhanghai/android/files/ui/ViewPagerTransformers.kt)).
 이 트랜스포머는 페이지에 **`alpha`, `scaleX/Y`, `translationX`, `translationZ`** 를 건다.
 
@@ -609,7 +609,7 @@ Media3의 기본값은 `surface_view`다. **반드시 명시적으로 바꿔야 
 
 ### 2.4 어댑터에 뷰 타입 도입
 
-[MediaViewerAdapter.kt](../app/src/main/java/me/zhanghai/android/files/viewer/image/ImageViewerAdapter.kt)
+[MediaViewerAdapter.kt](../app/src/main/java/me/zhanghai/android/files/viewer/media/MediaViewerAdapter.kt)
 
 지금은 `SimpleAdapter<Path, MediaViewerAdapter.ViewHolder>`이고 ViewHolder가 하나뿐이다.
 `FileListAdapter`가 날짜 타일을 넣을 때 쓴 것과 **같은 방식**으로 두 종류로 나눈다
@@ -890,7 +890,7 @@ ExoPlayer의 기본 `DataSource`는 `content://`와 `file://`을 모두 연다.
 
 ### 3.2 프래그먼트에 붙이기
 
-[MediaViewerFragment.kt](../app/src/main/java/me/zhanghai/android/files/viewer/image/ImageViewerFragment.kt)
+[MediaViewerFragment.kt](../app/src/main/java/me/zhanghai/android/files/viewer/media/MediaViewerFragment.kt)
 
 - [ ] 클래스에 `@OptIn(UnstableApi::class)`를 붙이고 필드를 추가한다.
 
@@ -1894,7 +1894,7 @@ class VideoDetailsDialogFragment : BottomSheetDialogFragment() {
 ```
 
 `args`·`putArgs`·`ParcelableParceler`·`requireParentFragment() as Listener`는 같은 패키지의
-[ConfirmDeleteDialogFragment.kt](../app/src/main/java/me/zhanghai/android/files/viewer/image/ConfirmDeleteDialogFragment.kt)와
+[ConfirmDeleteDialogFragment.kt](../app/src/main/java/me/zhanghai/android/files/viewer/media/ConfirmDeleteDialogFragment.kt)와
 같은 형태다. `show()`만 공용 확장 함수를 쓰지 않는데, 그쪽은 태그를 `null`로 넘겨
 ([DialogFragmentExtensions.kt:11](../app/src/main/java/me/zhanghai/android/files/util/DialogFragmentExtensions.kt#L11))
 나중에 시트를 찾을 수 없기 때문이다.
@@ -2150,7 +2150,7 @@ class MediaViewerFragment :
 ### 8.2 공유 MIME (기획서 §9)
 
 지금 `share()`는 타입이 `image/*`로 고정돼 있다
-([ImageViewerFragment.kt:204](../app/src/main/java/me/zhanghai/android/files/viewer/image/ImageViewerFragment.kt#L204)).
+(`ImageViewerFragment.kt:204`).
 
 - [ ] 실제 MIME 타입을 쓰게 바꾼다.
 

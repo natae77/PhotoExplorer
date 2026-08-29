@@ -495,7 +495,7 @@ FileListLiveData.loadValue()          ← 백그라운드 스레드
 정렬 메뉴 맨 아래에 **"이 폴더에만 적용"**(Only for this folder,
 [strings.xml:297](../app/src/main/res/values/strings.xml#L297)) 체크박스가 있고,
 켜야만 그 폴더의 보기 모드·정렬이 경로별로 저장된다
-([FileViewSortPathSpecificLiveData.kt](../app/src/main/java/me/zhanghai/android/files/filelist/FileViewSortPathSpecificLiveData.kt)).
+(`FileViewSortPathSpecificLiveData.kt`).
 
 | # | 문제 |
 |---|---|

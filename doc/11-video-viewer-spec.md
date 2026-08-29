@@ -127,7 +127,7 @@
 
 ### 4.3 페이지 레이아웃
 
-한 페이지 레이아웃([image_viewer_item.xml](../app/src/main/res/layout/image_viewer_item.xml))에는
+한 페이지 레이아웃(`image_viewer_item.xml`)에는
 지금 `PhotoView`와 `SubsamplingScaleImageView`가 겹쳐 있고 이미지 크기에 따라 하나만 보인다.
 **동영상 페이지는 별도 레이아웃**으로 분리한다 — 재생용 뷰는 이미지 로딩 경로를 전혀 타지 않고,
 같은 레이아웃에 세 번째 뷰를 겹쳐 두면 어느 것이 보이는지 따지는 분기가 늘기만 한다.
@@ -148,7 +148,7 @@
 
 **재생기 인스턴스는 뷰어 전체에서 하나만 둔다.** 페이지마다 만들지 않는다.
 
-`ViewPager2`의 `offscreenPageLimit = 1`([ImageViewerFragment.kt:112](../app/src/main/java/me/zhanghai/android/files/viewer/image/ImageViewerFragment.kt#L112))이라
+`ViewPager2`의 `offscreenPageLimit = 1`(`ImageViewerFragment.kt:112`)이라
 앞뒤 페이지까지 최대 세 개가 살아있다. 하드웨어 디코더는 기기마다 몇 개뿐이라
 인스턴스를 페이지 수만큼 만들면 금방 바닥나고, 그때부터 재생이 조용히 실패한다.
 
@@ -220,7 +220,7 @@
 화면을 탭하면 **앱 바와 재생 컨트롤이 같이 나타나고 같이 사라진다.**
 
 지금 뷰어는 탭하면 몰입 모드가 토글되면서 앱 바가 오르내린다
-([ImageViewerFragment.kt:92](../app/src/main/java/me/zhanghai/android/files/viewer/image/ImageViewerFragment.kt#L92)).
+(`ImageViewerFragment.kt:92`).
 재생 컨트롤이 자기만의 자동 숨김 타이머로 따로 놀면 "앱 바는 사라졌는데 컨트롤은 남아있는"
 어정쩡한 상태가 생긴다. 컨트롤의 **자동 숨김은 끄고**, 앱 바를 여닫는 곳에 묶는다.
 
@@ -305,7 +305,7 @@ HDR10·HDR10+·Dolby Vision도 흔하다. 기기에 디코더가 없거나 파�
 
 **공유의 MIME 타입.** 지금 뷰어의 공유는 `createSendImageIntent()`를 써서
 타입이 `image/*`로 **고정**돼 있다([IntentExtensions.kt:126](../app/src/main/java/me/zhanghai/android/files/util/IntentExtensions.kt#L126),
-[ImageViewerFragment.kt:204](../app/src/main/java/me/zhanghai/android/files/viewer/image/ImageViewerFragment.kt#L204)).
+`ImageViewerFragment.kt:204`).
 동영상을 이대로 공유하면 받는 앱이 사진인 줄 알고 잘못 처리한다.
 **그 파일의 실제 MIME 타입**을 쓰도록 고친다 — 범용 `createSendStreamIntent(mimeType)`이
 바로 아래([:138](../app/src/main/java/me/zhanghai/android/files/util/IntentExtensions.kt#L138))에 이미 있다.
@@ -381,11 +381,11 @@ HDR10·HDR10+·Dolby Vision도 흔하다. 기기에 디코더가 없거나 파�
 | 파일 | 무엇이 걸리나 |
 |---|---|
 | [FileListFragment.kt:1393](../app/src/main/java/me/zhanghai/android/files/filelist/FileListFragment.kt#L1393) | 뷰어 목록에 재생 가능한 동영상을 추가 (§4.2) |
-| [ImageViewerActivity.kt](../app/src/main/java/me/zhanghai/android/files/viewer/image/ImageViewerActivity.kt) | 이름 변경 (§4.1) |
-| [ImageViewerFragment.kt](../app/src/main/java/me/zhanghai/android/files/viewer/image/ImageViewerFragment.kt) | 플레이어 소유·수명, 페이지 전환 처리, 메뉴 확장, 공유 MIME (§5·§6·§9) |
-| [ImageViewerAdapter.kt](../app/src/main/java/me/zhanghai/android/files/viewer/image/ImageViewerAdapter.kt) | 페이지 종류 분기, 동영상 페이지 바인딩 (§4.3) |
-| [image_viewer_item.xml](../app/src/main/res/layout/image_viewer_item.xml) | 동영상 페이지는 별도 레이아웃으로 (§4.3) |
-| [image_viewer.xml (menu)](../app/src/main/res/menu/image_viewer.xml) | "재생 속도", "세부 정보" 추가 (§6.3·§7) |
+| `ImageViewerActivity.kt` | 이름 변경 (§4.1) |
+| `ImageViewerFragment.kt` | 플레이어 소유·수명, 페이지 전환 처리, 메뉴 확장, 공유 MIME (§5·§6·§9) |
+| `ImageViewerAdapter.kt` | 페이지 종류 분기, 동영상 페이지 바인딩 (§4.3) |
+| `image_viewer_item.xml` | 동영상 페이지는 별도 레이아웃으로 (§4.3) |
+| `image_viewer.xml` (menu) | "재생 속도", "세부 정보" 추가 (§6.3·§7) |
 | [IntentExtensions.kt:126](../app/src/main/java/me/zhanghai/android/files/util/IntentExtensions.kt#L126) | 공유 MIME 고정 문제 (§9) |
 | [MediaCreatedTime.kt](../app/src/main/java/me/zhanghai/android/files/file/MediaCreatedTime.kt) | 촬영 시각을 그대로 재사용. **수정하지 않는다** (§7.2) |
 | [AndroidManifest.xml:339](../app/src/main/AndroidManifest.xml#L339) | 액티비티 이름 변경. 인텐트 필터는 그대로 (§4.1) |
