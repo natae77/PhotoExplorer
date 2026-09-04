@@ -36,6 +36,22 @@ class FileListActivity : AppActivity() {
         }
     }
 
+    /**
+     * Where the media viewer tells us which file to fly back into, see plan 14 section 3.4 (2).
+     *
+     * This is called before the return transition starts, which is the only moment the grid still
+     * has to scroll and remap the shared element in.
+     */
+    override fun onActivityReenter(resultCode: Int, data: Intent?) {
+        super.onActivityReenter(resultCode, data)
+
+        // We can be reached after being destroyed and recreated, and onCreate() may not have run.
+        if (!::fragment.isInitialized) {
+            return
+        }
+        fragment.onMediaViewerReenter(resultCode, data)
+    }
+
     override fun onKeyShortcut(keyCode: Int, event: KeyEvent): Boolean {
         if (fragment.onKeyShortcut(keyCode, event)) {
             return true

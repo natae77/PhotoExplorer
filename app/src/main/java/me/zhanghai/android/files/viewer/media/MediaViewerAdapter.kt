@@ -144,6 +144,10 @@ class MediaViewerAdapter(
             }
             binding.thumbnailImage.load(path to attributes) {
                 size(Size.ORIGINAL)
+                // ⚠️ The return transition hands this drawable to the framework, which snapshots
+                // it into a software Canvas - a hardware bitmap throws there. Coil only sometimes
+                // returns one, so leaving it on crashes intermittently. See plan 14 section 3.5.
+                allowHardware(false)
                 fadeIn(binding.thumbnailImage.context.shortAnimTime)
                 listener(
                     onSuccess = { _, _ -> holder.progress.end(DelayedProgress.Reason.THUMBNAIL) },
@@ -199,6 +203,10 @@ class MediaViewerAdapter(
                 isVisible = true
                 load(path to imageInfo.attributes) {
                     size(Size.ORIGINAL)
+                    // Same as above: this is what the return transition flies with. Coil keeps a
+                    // CrossfadeDrawable installed for good, so the bitmap cannot be unwrapped and
+                    // copied afterwards either - it has to be software from the start.
+                    allowHardware(false)
                     fadeIn(context.shortAnimTime)
                     listener(
                         onSuccess = { _, _ -> binding.progress.fadeOutUnsafe() },

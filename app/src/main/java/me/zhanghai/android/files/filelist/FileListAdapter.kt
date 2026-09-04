@@ -46,6 +46,7 @@ import me.zhanghai.android.files.ui.CheckableItemBackground
 import me.zhanghai.android.files.util.isMaterial3Theme
 import me.zhanghai.android.files.util.layoutInflater
 import me.zhanghai.android.files.util.valueCompat
+import me.zhanghai.android.files.viewer.media.mediaTransitionName
 import java.text.SimpleDateFormat
 import java.time.DayOfWeek
 import java.time.Instant
@@ -100,6 +101,13 @@ class FileListAdapter(
             .map { it.file }
             .filter { it.attributes.isDirectory }
             .mapTo(mutableSetOf()) { it.path }
+    /**
+     * The full adapter position of [path], or null when it is not on the list.
+     *
+     * Media mode mixes date tiles in among the files, so counting files gives the wrong position -
+     * this map is the only honest answer. See plan 14 section 3.3.
+     */
+    fun findFilePosition(path: Path): Int? = filePositionMap[path]
 
     private lateinit var _nameEllipsize: TextUtils.TruncateAt
     var nameEllipsize: TextUtils.TruncateAt
@@ -448,10 +456,21 @@ class FileListAdapter(
         holder.thumbnailImage.apply {
             dispose()
             setImageDrawable(null)
+            // Only media tiles take part in the shared element transition. bindFileViewHolder() is
+            // shared by all three view types, so this has to be cleared for the other two rather
+            // than merely left unset. See plan 14 section 3.2.3.
+            transitionName = if (isMedia) mediaTransitionName(path) else null
             val shouldLoadThumbnail = supportsThumbnail && !shouldLoadThumbnailIcon
             isVisible = shouldLoadThumbnail
             if (shouldLoadThumbnail) {
                 load(path to attributes) {
+                    // ⚠️ The shared element transition snapshots this view by drawing it into a
+                    // software Canvas, and a hardware bitmap throws there
+                    // (SharedElementCallback.createDrawableBitmap). Media mode is the only mode
+                    // that takes part, so the other two keep their hardware bitmaps.
+                    if (isMedia) {
+                        allowHardware(false)
+                    }
                     listener { _, _ ->
                         val iconImage = holder.thumbnailIconImage ?: holder.iconImage
                         iconImage?.isVisible = false

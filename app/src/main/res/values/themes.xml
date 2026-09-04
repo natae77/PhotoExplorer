@@ -20,6 +20,11 @@
         <!-- https://developer.android.com/training/tv/start/start#transition-color -->
         <item name="android:windowAllowEnterTransitionOverlap">true</item>
         <item name="android:windowAllowReturnTransitionOverlap">true</item>
+        <!--
+          ~ Shared element transitions between the media grid and the viewer, see plan 14 step 1.
+          ~ Theme.Material already turns this on, but the parent chain is not ours to rely on.
+          -->
+        <item name="android:windowActivityTransitions">true</item>
 
         <item name="colorPrimary">@color/color_primary</item>
         <item name="colorPrimaryVariant">?colorPrimary</item>
@@ -70,6 +75,11 @@
         <!-- https://developer.android.com/training/tv/start/start#transition-color -->
         <item name="android:windowAllowEnterTransitionOverlap">true</item>
         <item name="android:windowAllowReturnTransitionOverlap">true</item>
+        <!--
+          ~ Shared element transitions between the media grid and the viewer, see plan 14 step 1.
+          ~ Theme.Material already turns this on, but the parent chain is not ours to rely on.
+          -->
+        <item name="android:windowActivityTransitions">true</item>
         <item name="android:windowBackground">@android:color/black</item>
 
         <item name="colorPrimary">@color/color_primary_dark</item>

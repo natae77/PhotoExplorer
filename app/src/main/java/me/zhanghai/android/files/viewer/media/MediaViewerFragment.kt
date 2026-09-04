@@ -5,18 +5,27 @@
 
 package me.zhanghai.android.files.viewer.media
 
+import android.app.Activity
 import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Drawable
+import android.os.Build
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuInflater
 import android.view.MenuItem
+import android.view.TextureView
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
+import androidx.activity.OnBackPressedCallback
 import androidx.annotation.OptIn
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.doOnPreDraw
+import androidx.core.view.drawToBitmap
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.interpolator.view.animation.FastOutSlowInInterpolator
@@ -31,6 +40,7 @@ import androidx.media3.ui.TimeBar
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
+import com.davemorrissey.labs.subscaleview.SubsamplingScaleImageView
 import dev.chrisbanes.insetter.applySystemWindowInsetsToPadding
 import java8.nio.file.Path
 import kotlinx.coroutines.Dispatchers
@@ -49,6 +59,7 @@ import me.zhanghai.android.files.ui.DepthPageTransformer
 import me.zhanghai.android.files.util.ParcelableArgs
 import me.zhanghai.android.files.util.ParcelableListParceler
 import me.zhanghai.android.files.util.ParcelableState
+import me.zhanghai.android.files.util.addOnBackPressedCallback
 import me.zhanghai.android.files.util.args
 import me.zhanghai.android.files.util.createSendStreamIntent
 import me.zhanghai.android.files.util.createViewIntent
@@ -66,6 +77,7 @@ import me.zhanghai.android.files.util.viewModels
 import me.zhanghai.android.files.util.withChooser
 import me.zhanghai.android.systemuihelper.SystemUiHelper
 import java.io.IOException
+import kotlin.math.roundToInt
 
 @OptIn(UnstableApi::class)
 class MediaViewerFragment :
@@ -92,6 +104,41 @@ class MediaViewerFragment :
 
     /** A finger on the slider keeps the player buffering, see spec 11a section 6.1. */
     private var isScrubbing = false
+
+    /**
+     * Whether we are on the way out, see plan 14 section 3.2.1.
+     *
+     * The activity's shared element callback is called in both directions, and the guard that
+     * refuses to fly an empty rectangle back has to apply to the return only: on the way in, the
+     * transition image is legitimately empty when onMapSharedElements() runs, because nothing has
+     * filled it in yet.
+     */
+    var isReturning = false
+        private set
+
+    /**
+     * Whether we were opened with a shared element at all, see plan 14 section 3.7 (F1, F2).
+     *
+     * A video opened from list mode, or a photo handed to us by another app, arrives with no
+     * ActivityOptions and leaves on the plain window animation. Emptying the pager for those would
+     * put a blank viewer on screen for the whole of it.
+     */
+    private var hasSharedElement = false
+
+    /**
+     * Whether the way in is still running, see plan 14 section 3.3.
+     *
+     * ⚠️ ViewPager2 dispatches onPageSelected() for the page we opened on during its first layout,
+     * which lands in the middle of the enter transition. Without this the safety net there would
+     * reveal the pager and start fading the picture out before the tile has finished growing - the
+     * exact double image this is all here to avoid.
+     */
+    private var isEntering = false
+
+    /** The transition image, or null while there is no view, see plan 14 section 3.2.2. */
+    val transitionImageOrNull: ImageView?
+        get() =
+            if (view != null && this::binding.isInitialized) binding.transitionImage else null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -185,6 +232,17 @@ class MediaViewerFragment :
                     // Do not start here. Fast flinging fires this for every page passed, and each
                     // one would briefly play sound. See spec 11 section 5.1.
                     stopPlaybackIfPageChanged()
+                    // ⚠️ Gated: ViewPager2 also fires this for the page we opened on, in the
+                    // middle of the enter transition. A real page change only happens once the way
+                    // in is over, and then anything left of the entering picture is stale.
+                    if (!isEntering) {
+                        hideTransitionImageWhenPageReady()
+                    }
+                    // The grid flies the page we leave from back into its own tile, and it only
+                    // learns which one that is from our result. See plan 14 section 3.4 (1).
+                    requireActivity().setResult(
+                        Activity.RESULT_OK, Intent().apply { extraPath = currentPath }
+                    )
                     updatePlayerControlVisibility()
                     // The playback speed and details items only exist on video pages.
                     requireActivity().invalidateOptionsMenu()
@@ -200,7 +258,286 @@ class MediaViewerFragment :
             // See plan 12 3.2.2.
             doOnPreDraw { startPlaybackIfVideoPage() }
         }
+        // The one place every way out passes through, see plan 14 section 3.6. Dragging down and
+        // the system back button already come here; the toolbar arrow is sent here by
+        // MediaViewerActivity.onSupportNavigateUp().
+        addOnBackPressedCallback(object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                prepareReturnTransition()
+                // This callback consumed the back press, so Activity.onBackPressed() will not run
+                // and nobody else is going to start the return transition for us.
+                requireActivity().finishAfterTransition()
+            }
+        })
     }
+
+    /**
+     * Hands the grid what it needs to fly the current media back into its tile, see plan 14
+     * sections 3.4 and 3.6.
+     *
+     * All of it happens in one frame, right before finishAfterTransition() captures the shared
+     * element.
+     */
+    private fun prepareReturnTransition() {
+        isReturning = true
+        val activity = requireActivity()
+        if (!hasSharedElement) {
+            // Nothing to return to. Leaving the pager alone keeps the ordinary window animation
+            // showing the picture rather than an empty screen. See plan 14 section 3.7.
+            logMediaTransition("viewer exit: no shared element, plain finish")
+            activity.setResult(Activity.RESULT_CANCELED)
+            return
+        }
+        val transitionImage = binding.transitionImage
+        val drawable = returnDrawable()
+        if (drawable == null) {
+            // Nothing worth sending: a zoomed photo, a page still loading, or one that failed.
+            // RESULT_CANCELED stops the grid from remapping, and the empty drawable is what stops
+            // our own callback from flying a blank rectangle. See plan 14 section 3.7.
+            logMediaTransition("viewer exit: setResult(CANCELED), nothing to send")
+            transitionImage.animate().cancel()
+            transitionImage.setImageDrawable(null)
+            activity.setResult(Activity.RESULT_CANCELED)
+            return
+        }
+        logMediaTransition("viewer exit: setResult(OK) for $currentPath")
+        activity.setResult(Activity.RESULT_OK, Intent().apply { extraPath = currentPath })
+        transitionImage.apply {
+            animate().cancel()
+            alpha = 1f
+            setImageDrawable(drawable)
+            // Carry on from wherever the downward drag left the page, see plan 14 section 3.6 (2).
+            // Alpha is left alone: a shared element should stay opaque while it travels.
+            val page = currentPageRoot()
+            translationY = page?.translationY ?: 0f
+            scaleX = page?.scaleX ?: 1f
+            scaleY = page?.scaleY ?: 1f
+        }
+        // The window lets the return transition overlap, so the same picture would otherwise be on
+        // screen twice - one flying to the tile, one fading out in place. Plan 14 3.6 (1).
+        binding.viewPager.isVisible = false
+        binding.appBarLayout.isVisible = false
+        binding.playerControlView.visibility = View.GONE
+    }
+
+    /** The picture to fly back with, or null when this page cannot take part (F4, F5). */
+    private fun returnDrawable(): Drawable? {
+        // A zoomed photo is not where it started, so there is nothing sensible to fly. The drag to
+        // dismiss test already asks exactly this question. See plan 14 section 3.7.
+        if (currentPageRoot()?.canDismiss?.invoke() == false) {
+            return null
+        }
+        val drawable = (currentPageContent() as? PageContent.Ready)?.drawable ?: return null
+        return drawable.toSoftwareDrawable()
+    }
+
+    /**
+     * ⚠️ A hardware bitmap cannot be handed to the transition.
+     *
+     * The framework captures the shared element by drawing it into a software Canvas, which throws
+     * on a hardware bitmap - and Coil hands those out for the photo pages and the video thumbnail.
+     * The copy is only paid for when the bitmap really is one; the tiled photo and the video frame
+     * are drawn by us and are software already. Returning null falls back rather than crashing.
+     */
+    private fun Drawable.toSoftwareDrawable(): Drawable? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            return this
+        }
+        val bitmap = (this as? BitmapDrawable)?.bitmap ?: return this
+        if (bitmap.config != Bitmap.Config.HARDWARE) {
+            return this
+        }
+        return try {
+            BitmapDrawable(resources, bitmap.copy(Bitmap.Config.ARGB_8888, false))
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    /**
+     * Fills the transition image with the picture we came in with, see plan 14 section 3.3.
+     *
+     * The snapshot is what the framework captured of the grid tile. Its default implementation
+     * makes either an ImageView carrying a drawable or a plain View carrying a background, so both
+     * have to be read. See plan 14 section 3.5.
+     */
+    /**
+     * Called when the framework accepts our transition image on the way in.
+     *
+     * ⚠️ This is also where the pager has to be hidden. The page is laid out at its final size and
+     * fully opaque from the very first frame, so a tile growing on top of a picture that is already
+     * there reads as two copies of one photo rather than as one photo growing. It is the way in's
+     * half of the problem section 3.6 (1) describes for the way out.
+     *
+     * This runs on the first pre-draw, before anything has been painted.
+     */
+    fun onEnterSharedElementMapped() {
+        hasSharedElement = true
+        val transitionImage = transitionImageOrNull ?: return
+        isEntering = true
+        // Alpha rather than visibility: the page still has to lay out and load while it is hidden,
+        // or currentPageContent() would never come back READY and we would never reveal it.
+        binding.viewPager.alpha = 0f
+        // ⚠️ Being mapped is not a promise that the transition will run. Until onSharedElementStart
+        // arrives the pager is hidden and the transition image is still empty, so every frame of
+        // waiting is a black screen - give up quickly and let the page show itself.
+        scheduleEnterGiveUp(transitionImage, ENTER_START_TIMEOUT_MILLIS)
+    }
+
+    private fun scheduleEnterGiveUp(transitionImage: ImageView, delayMillis: Long) {
+        transitionImage.removeCallbacks(enterGiveUpRunnable)
+        transitionImage.postDelayed(enterGiveUpRunnable, delayMillis)
+    }
+
+    private val enterGiveUpRunnable = Runnable { onEnterTransitionEnd() }
+
+    /** The way in is over - called by the framework, or by the timeout above if it never is. */
+    fun onEnterTransitionEnd() {
+        if (!isEntering) {
+            return
+        }
+        isEntering = false
+        transitionImageOrNull?.removeCallbacks(enterGiveUpRunnable)
+        logMediaTransition("viewer: revealing pager, fading transition image out")
+        hideTransitionImageWhenPageReady()
+    }
+
+    fun showTransitionImage(snapshot: View) {
+        val transitionImage = transitionImageOrNull ?: return
+        val drawable = (snapshot as? ImageView)?.drawable ?: snapshot.background
+        if (drawable == null) {
+            // The transition is running but we have nothing to cover the pager with, so there is
+            // no reason to keep it hidden.
+            onEnterTransitionEnd()
+            return
+        }
+        // It really is running now, so allow it the time it needs.
+        scheduleEnterGiveUp(transitionImage, ENTER_END_TIMEOUT_MILLIS)
+        transitionImage.apply {
+            animate().cancel()
+            alpha = 1f
+            translationY = 0f
+            scaleX = 1f
+            scaleY = 1f
+            setImageDrawable(drawable)
+        }
+    }
+
+    /**
+     * Fades the transition image out once the page underneath has something to show, see plan 14
+     * section 3.3.
+     *
+     * Going by the transition alone would blink a blank screen for a page that is still loading.
+     */
+    fun hideTransitionImageWhenPageReady(attempt: Int = 0) {
+        val transitionImage = transitionImageOrNull ?: return
+        // Only reached once the way in is over. The transition image still covers the pager
+        // opaquely, so bringing it back now is not visible until the fade below uncovers it.
+        binding.viewPager.alpha = 1f
+        if (transitionImage.drawable == null) {
+            return
+        }
+        if (currentPageContent() is PageContent.Loading && attempt < TRANSITION_IMAGE_WAIT_FRAMES) {
+            binding.viewPager.doOnPreDraw { hideTransitionImageWhenPageReady(attempt + 1) }
+            return
+        }
+        transitionImage.animate()
+            .alpha(0f)
+            .setDuration(mediumAnimTime.toLong())
+            .withEndAction {
+                // Emptied rather than hidden: it has to stay VISIBLE for the return transition to
+                // be able to capture it at all. See plan 14 section 3.1.
+                transitionImage.setImageDrawable(null)
+                transitionImage.alpha = 1f
+            }
+            .start()
+    }
+
+    /**
+     * What the page on screen can show right now, see plan 14 section 3.5.
+     *
+     * Read straight off the views: loading finishes inside MediaViewerAdapter and there is no way
+     * out of it, and this is only asked twice in a viewer session.
+     */
+    private fun currentPageContent(): PageContent =
+        when (val holder = pageHolderAt(binding.viewPager.currentItem)) {
+            is MediaViewerAdapter.ImageViewHolder -> {
+                val itemBinding = holder.binding
+                when {
+                    itemBinding.errorText.isVisible -> PageContent.Error
+                    itemBinding.image.isVisible ->
+                        itemBinding.image.drawable
+                            ?.let { PageContent.Ready(it) } ?: PageContent.Loading
+                    itemBinding.largeImage.isVisible ->
+                        if (itemBinding.largeImage.isReady) {
+                            largeImageContent(itemBinding.largeImage)
+                        } else {
+                            PageContent.Loading
+                        }
+                    else -> PageContent.Loading
+                }
+            }
+            is MediaViewerAdapter.VideoViewHolder -> {
+                val itemBinding = holder.binding
+                when {
+                    itemBinding.errorLayout.isVisible -> PageContent.Error
+                    // Playing: the current frame is what the eye is on, and the texture is already
+                    // the size of the video rather than of the whole page. Plan 14 D12.
+                    itemBinding.playerView.isVisible ->
+                        (itemBinding.playerView.videoSurfaceView as? TextureView)?.bitmap
+                            ?.let { PageContent.Ready(BitmapDrawable(resources, it)) }
+                            ?: PageContent.Loading
+                    itemBinding.thumbnailImage.isVisible ->
+                        itemBinding.thumbnailImage.drawable
+                            ?.let { PageContent.Ready(it) } ?: PageContent.Loading
+                    else -> PageContent.Loading
+                }
+            }
+            else -> PageContent.Loading
+        }
+
+    /**
+     * The visible part of a tiled photo, without its letterbox.
+     *
+     * Drawing the whole view in would bring the black bars with it, and the framework applies the
+     * tile's centerCrop at the far end of the transition - so a landscape photo would jump at the
+     * very last moment. PhotoView hands over its original drawable and a TextureView is already
+     * the shape of the video, so only this branch has to crop. See plan 14 section 3.5.
+     */
+    private fun largeImageContent(view: SubsamplingScaleImageView): PageContent {
+        val viewWidth = view.width
+        val viewHeight = view.height
+        if (viewWidth <= 0 || viewHeight <= 0) {
+            return PageContent.Loading
+        }
+        val orientation = view.appliedOrientation
+        val rotated90Or270 = orientation == SubsamplingScaleImageView.ORIENTATION_90
+            || orientation == SubsamplingScaleImageView.ORIENTATION_270
+        val imageWidth = if (rotated90Or270) view.sHeight else view.sWidth
+        val imageHeight = if (rotated90Or270) view.sWidth else view.sHeight
+        if (imageWidth <= 0 || imageHeight <= 0) {
+            return PageContent.Loading
+        }
+        // We only get here at the minimum scale - returnDrawable() turns a zoomed page away - so
+        // the picture is fitted and centred, and that is all it takes to find it.
+        val scale = view.scale
+        val width = (imageWidth * scale).roundToInt().coerceIn(1, viewWidth)
+        val height = (imageHeight * scale).roundToInt().coerceIn(1, viewHeight)
+        val left = (viewWidth - width) / 2
+        val top = (viewHeight - height) / 2
+        val bitmap = try {
+            Bitmap.createBitmap(view.drawToBitmap(), left, top, width, height)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return PageContent.Error
+        }
+        return PageContent.Ready(BitmapDrawable(resources, bitmap))
+    }
+
+    /** The page on screen, or null when it has no view right now. */
+    private fun currentPageRoot(): SwipeDownDismissLayout? =
+        pageHolderAt(binding.viewPager.currentItem)?.itemView as? SwipeDownDismissLayout
 
     override fun onResume() {
         super.onResume()
@@ -320,10 +657,12 @@ class MediaViewerFragment :
      * ViewPager2 hides its RecyclerView and offers no public way to reach a page, and a page that
      * is off screen may have no view at all. Callers give up quietly when this returns null.
      */
-    private fun videoHolderAt(position: Int): MediaViewerAdapter.VideoViewHolder? {
+    private fun videoHolderAt(position: Int): MediaViewerAdapter.VideoViewHolder? =
+        pageHolderAt(position) as? MediaViewerAdapter.VideoViewHolder
+
+    private fun pageHolderAt(position: Int): RecyclerView.ViewHolder? {
         val recyclerView = binding.viewPager.getChildAt(0) as? RecyclerView ?: return null
-        val holder = recyclerView.findViewHolderForAdapterPosition(position)
-        return holder as? MediaViewerAdapter.VideoViewHolder
+        return recyclerView.findViewHolderForAdapterPosition(position)
     }
 
     private val playerListener = object : Player.Listener {
@@ -582,6 +921,20 @@ class MediaViewerFragment :
     companion object {
         // Spec 11 section 6.3. 0.25 is there to slow fast motion down, e.g. a golf swing.
         private val PLAYBACK_SPEEDS = floatArrayOf(0.25f, 0.5f, 0.75f, 1f, 1.5f, 2f)
+
+        /**
+         * How many frames to wait for the page under the entering picture, see plan 14 section 3.3.
+         *
+         * A photo off the disk arrives within a couple of frames; anything slower has to give up
+         * rather than leave the picture stuck on top of the pager.
+         */
+        private const val TRANSITION_IMAGE_WAIT_FRAMES = 30
+
+        /** How long to wait for a mapped transition to actually start before giving up on it. */
+        private const val ENTER_START_TIMEOUT_MILLIS = 300L
+
+        /** How long a started transition may run before we stop waiting for its end. */
+        private const val ENTER_END_TIMEOUT_MILLIS = 1500L
 
         private val SPEED_ITEM_IDS = intArrayOf(
             R.id.action_speed_0_25, R.id.action_speed_0_5, R.id.action_speed_0_75,

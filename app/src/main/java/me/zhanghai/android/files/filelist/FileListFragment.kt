@@ -26,6 +26,7 @@ import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
@@ -35,10 +36,14 @@ import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SearchView
 import androidx.appcompat.widget.Toolbar
+import androidx.core.app.ActivityCompat
+import androidx.core.app.ActivityOptionsCompat
+import androidx.core.app.SharedElementCallback
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
 import androidx.core.view.GravityCompat
+import androidx.core.view.doOnPreDraw
 import androidx.core.view.isVisible
 import androidx.core.view.updatePaddingRelative
 import androidx.drawerlayout.widget.DrawerLayout
@@ -123,6 +128,7 @@ import me.zhanghai.android.files.util.getDimensionDp
 import me.zhanghai.android.files.util.getQuantityString
 import me.zhanghai.android.files.util.hasSw600Dp
 import me.zhanghai.android.files.util.isOrientationLandscape
+import me.zhanghai.android.files.util.launchSafe
 import me.zhanghai.android.files.util.putArgs
 import me.zhanghai.android.files.util.setOnEditorConfirmActionListener
 import me.zhanghai.android.files.util.showToast
@@ -134,6 +140,8 @@ import me.zhanghai.android.files.util.viewModels
 import me.zhanghai.android.files.util.withChooser
 import me.zhanghai.android.files.viewer.media.MediaViewerActivity
 import me.zhanghai.android.files.viewer.media.isPlayableVideo
+import me.zhanghai.android.files.viewer.media.logMediaTransition
+import me.zhanghai.android.files.viewer.media.mediaTransitionName
 import kotlin.math.roundToInt
 
 class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayout.Listener,
@@ -166,6 +174,12 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
         RequestPermissionInSettingsContract(android.Manifest.permission.POST_NOTIFICATIONS),
         this::onRequestNotificationPermissionInSettingsResult
     )
+    // The viewer has to come back with a result for onActivityReenter() to be called at all, so it
+    // cannot be started with startActivitySafe(). The result itself is read there, not here.
+    // See plan 14 section 3.3 (2).
+    private val openMediaViewerLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {}
 
     private val args by args<Args>()
     private val argsPath by lazy { args.intent.extraPath }
@@ -180,6 +194,16 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
 
     // Media mode starts at the newest item, but only once per folder. See plan step 5.
     private var hasScrolledToLatest = false
+
+    /**
+     * The file the media viewer wants to be flown back into, see plan 14 section 3.4.
+     *
+     * ⚠️ Also the flag that tells the exit callback which direction it is being called in - it is
+     * called on the way out to the viewer too. Cleared when the viewer is started rather than when
+     * it is read: onMapSharedElements() is called twice on some devices, and the second call would
+     * otherwise put the tile we opened from back in.
+     */
+    private var pendingReturnPath: Path? = null
 
     // The folder the list currently on screen was loaded for. fileListLiveData is a switch map on
     // the current path and keeps the previous folder's value until the new one arrives, so its
@@ -264,6 +288,10 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
         binding.recyclerView.addItemDecoration(
             FileListDividerItemDecoration(requireContext(), adapter)
         )
+        // ⚠️ Registered here rather than when the viewer is started: the coordinator that runs the
+        // return reads this listener off the activity when the viewer is launched, so it has to be
+        // in place before then. See plan 14 section 3.4 (3).
+        ActivityCompat.setExitSharedElementCallback(activity, mediaExitSharedElementCallback)
         val fastScroller = ThemedFastScroller.create(binding.recyclerView)
         binding.recyclerView.setOnApplyWindowInsetsListener(
             ScrollingViewOnApplyWindowInsetsListener(binding.recyclerView, fastScroller)
@@ -1412,7 +1440,12 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
         }
         // Playable videos open in our own viewer. There is no video/* intent filter (spec 11 D4),
         // so the implicit view intent below would always land in another app.
-        if (file.path.isPlayableVideo) {
+        //
+        // Photos normally leave as an implicit image/* intent and only come back to us when we are
+        // the default app, which would leave media mode with the transition on videos alone. In
+        // media mode we are the gallery, so we route them explicitly. See plan 14 section 3.0 (D14).
+        if (file.path.isPlayableVideo
+            || (viewModel.viewType == FileViewType.MEDIA && file.mimeType.isImage)) {
             openMediaViewer(file)
             return
         }
@@ -1432,7 +1465,142 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
             openFileWithIntent(file, false)
             return
         }
-        startActivitySafe(intent)
+        // Whatever the last visit left behind is stale from here on, see plan 14 section 3.4 (3).
+        pendingReturnPath = null
+        val options = mediaTransitionOptions(file.path)
+        logMediaTransition(
+            "grid open: ${file.path} viewType=${viewModel.viewType}" +
+                " options=${if (options != null) "attached" else "none"}"
+        )
+        if (options == null) {
+            // Not media mode, or the tile is not on screen: the plain activity transition then,
+            // quietly. See plan 14 section 3.7 (F1).
+            startActivitySafe(intent)
+            return
+        }
+        openMediaViewerLauncher.launchSafe(intent, options, this)
+    }
+
+    /** The tile to grow into the viewer, or null when there is nothing to grow. */
+    private fun mediaTransitionOptions(path: Path): ActivityOptionsCompat? {
+        if (viewModel.viewType != FileViewType.MEDIA) {
+            return null
+        }
+        val tile = mediaTileImageFor(path) ?: return null
+        return ActivityOptionsCompat.makeSceneTransitionAnimation(
+            requireActivity(), tile, mediaTransitionName(path)
+        )
+    }
+
+    /**
+     * The thumbnail of [path]'s tile, or null when it has no view on screen right now.
+     *
+     * ⚠️ Media mode mixes date tiles in among the files, so the adapter's own map is the only
+     * honest way from a path to an adapter position. See plan 14 section 3.3.
+     */
+    private fun mediaTileImageFor(path: Path): ImageView? {
+        val position = adapter.findFilePosition(path) ?: return null
+        val holder = binding.recyclerView.findViewHolderForAdapterPosition(position)
+            as? FileListAdapter.ViewHolder ?: return null
+        return holder.thumbnailImage.takeIf { it.isVisible }
+    }
+
+    /**
+     * Takes note of which file the viewer ended on, see plan 14 section 3.4 (2).
+     *
+     * Called before the return transition starts, so this is also where the grid still has time to
+     * scroll a tile that is off screen into view.
+     */
+    fun onMediaViewerReenter(resultCode: Int, data: Intent?) {
+        pendingReturnPath = null
+        if (view == null || !isAdded) {
+            return
+        }
+        // ⚠️ Videos open in our viewer from every view type, so without this the list and grid
+        // modes would jump around for a transition they never take part in. Plan 14 3.7 (F1).
+        if (viewModel.viewType != FileViewType.MEDIA) {
+            return
+        }
+        // RESULT_CANCELED is the viewer saying it has nothing to send (F4, F5).
+        if (resultCode != Activity.RESULT_OK) {
+            return
+        }
+        val path = data?.extraPath ?: return
+        val position = adapter.findFilePosition(path)
+        if (position == null) {
+            logMediaTransition("grid reenter: $path is not on the list -> fallback")
+            return
+        }
+        pendingReturnPath = path
+        if (mediaTileImageFor(path) != null) {
+            // Already on screen, nothing to wait for.
+            logMediaTransition("grid reenter: $path on screen, no postpone")
+            return
+        }
+        val activity = requireActivity()
+        activity.supportPostponeEnterTransition()
+        var hasResumed = false
+        val resume = Runnable {
+            if (!hasResumed) {
+                hasResumed = true
+                logMediaTransition("grid reenter: start postponed")
+                activity.supportStartPostponedEnterTransition()
+            }
+        }
+        logMediaTransition("grid reenter: postpone, scrolling to $position")
+        layoutManager.scrollToPositionWithOffset(position, mediaReturnScrollOffset())
+        // ⚠️ Without this the tile has no view yet when the shared element is mapped, and the
+        // transition falls back silently. See plan 14 section 3.4.
+        binding.recyclerView.doOnPreDraw { resume.run() }
+        // ⚠️ A postpone without its start freezes the screen, so it always has an end.
+        binding.recyclerView.postDelayed(resume, POSTPONE_RETURN_TIMEOUT_MILLIS)
+    }
+
+    /**
+     * Where to put the tile we scroll back to.
+     *
+     * The list already starts below the app bar (ScrollingViewBehavior), so there is no bar height
+     * to add - this only aims for the middle of the list. Media tiles are square.
+     */
+    private fun mediaReturnScrollOffset(): Int {
+        val recyclerView = binding.recyclerView
+        val spanCount = layoutManager.spanCount
+        val tileHeight = if (spanCount > 0) recyclerView.width / spanCount else 0
+        return ((recyclerView.height - tileHeight) / 2).coerceAtLeast(0)
+    }
+
+    /**
+     * Points the return transition at the tile of the file the viewer ended on, see plan 14 3.4 (3).
+     *
+     * ⚠️ This is called on the way out to the viewer as well, where the tile the framework already
+     * found is the right one - hence doing nothing at all unless a return is pending.
+     */
+    private val mediaExitSharedElementCallback = object : SharedElementCallback() {
+        override fun onMapSharedElements(
+            names: MutableList<String>,
+            sharedElements: MutableMap<String, View>
+        ) {
+            val path = pendingReturnPath
+            if (path == null) {
+                logMediaTransition("grid map: opening, names=$names -> left alone")
+                return
+            }
+            val tile = mediaTileImageFor(path)
+            if (tile == null) {
+                // The file is gone, or too far outside the list the viewer was given. Empty both,
+                // or the framework flies the tile we opened from. See plan 14 3.7 (F3).
+                logMediaTransition("grid map: no tile for $path -> blocked")
+                names.clear()
+                sharedElements.clear()
+                return
+            }
+            logMediaTransition("grid map: returning to $path, names=$names -> remapped")
+            val name = mediaTransitionName(path)
+            names.clear()
+            names.add(name)
+            sharedElements.clear()
+            sharedElements[name] = tile
+        }
     }
 
     private fun openApk(file: FileItem) {
@@ -1850,6 +2018,14 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
             "me.zhanghai.android.files.intent.action.VIEW_DOWNLOADS"
 
         private const val MEDIA_VIEWER_PATH_LIST_SIZE_MAX = 1000
+
+        /**
+         * How long to hold the return transition while the grid scrolls, see plan 14 section 3.4.
+         *
+         * A postpone that is never started leaves the screen frozen on the viewer, so the wait for
+         * the layout pass is given an end even if that layout never comes.
+         */
+        private const val POSTPONE_RETURN_TIMEOUT_MILLIS = 500L
     }
 
     private class RequestAllFilesAccessContract : ActivityResultContract<Unit, Boolean>() {

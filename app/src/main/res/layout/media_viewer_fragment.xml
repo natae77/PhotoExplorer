@@ -27,6 +27,24 @@
         app:play_icon="@drawable/exo_icon_play"
         app:pause_icon="@drawable/exo_icon_pause" />
 
+    <!--
+      ~ The one view that flies between the grid tile and the viewer, see plan 14 section 3.1.
+      ~
+      ~ It is an ImageView so that ChangeImageTransform can carry the tile's centerCrop over to
+      ~ fitCenter - SubsamplingScaleImageView and PlayerView are not ImageViews and would arrive
+      ~ cropped. It stays VISIBLE at all times because ChangeBounds and ChangeImageTransform skip
+      ~ anything that is not; what makes it invisible in practice is having no drawable.
+      ~
+      ~ Below the app bar on purpose: once the enter transition ends, the toolbar icons have to be
+      ~ reachable while this is still fading out.
+      -->
+    <ImageView
+        android:id="@+id/transitionImage"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitCenter"
+        android:contentDescription="@null" />
+
     <FrameLayout
         android:id="@+id/appBarLayout"
         android:layout_width="match_parent"
