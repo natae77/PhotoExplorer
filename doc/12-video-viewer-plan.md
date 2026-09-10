@@ -591,21 +591,28 @@ val mimeType = AndroidFileTypeDetector.getMimeType(this, attributes).asMimeType(
 `app:shutter_background_color="@android:color/transparent"`로 셔터를 투명하게 만드는
 방법도 있지만, 그러면 준비되는 동안 뒤에 있는 것이 비쳐 보인다. **순서로 푸는 쪽을 쓴다.**
 
-#### ⚠️ `surface_type="texture_view"` — 이걸 `surface_view`로 두면 페이지 전환이 깨진다
+#### 2.3.2 `surface_type="surface_view"` — HDR 출력과 페이지 전환
 
 이 뷰어는 `DepthPageTransformer`를 쓴다
 ([MediaViewerFragment](../app/src/main/java/me/zhanghai/android/files/viewer/media/MediaViewerFragment.kt),
 [ViewPagerTransformers.kt](../app/src/main/java/me/zhanghai/android/files/ui/ViewPagerTransformers.kt)).
 이 트랜스포머는 페이지에 **`alpha`, `scaleX/Y`, `translationX`, `translationZ`** 를 건다.
 
-`SurfaceView`는 윈도우에 구멍을 뚫고 그 뒤에서 따로 그리는 뷰라 **`alpha`도 `scale`도 먹지 않는다.**
-그대로 두면 페이지를 넘기는 내내 동영상만 불투명하게, 원래 크기로 남아서 옆 페이지 위를 덮는다.
-`TextureView`는 일반 뷰처럼 그려지므로 트랜스포머가 그대로 적용된다.
+처음 구현할 때는 페이지 변환을 확실히 적용하려고 `TextureView`를 골랐다. 그러나 갤럭시의
+HLG/HDR 영상을 재생하면 Samsung Gallery보다 중간톤과 그림자가 크게 어두웠다. Android의
+`TextureView` HDR 지원은 제한적이고 HDR을 SDR로 변환하지만, `SurfaceView`는 플랫폼 HDR
+출력 경로를 그대로 쓴다. 그래서 **Media3 기본값인 `surface_view`로 되돌린다.** 전력 소비와
+프레임 타이밍도 `SurfaceView` 쪽이 유리하다.
 
-Media3의 기본값은 `surface_view`다. **반드시 명시적으로 바꿔야 한다.**
+2026-09-10 Android 16(API 36) Pixel 8 에뮬레이터에서 다음을 확인했다.
 
-대가도 적어 둔다 — `TextureView`는 전력과 지연이 조금 더 들고, 보호 콘텐츠(DRM) 출력을 못 한다.
-폰으로 찍은 로컬 파일이 대상이라 둘 다 해당하지 않는다.
+- SurfaceFlinger에 `MediaViewerActivity`의 별도 `SurfaceView (BLAST)` 레이어가 생긴다.
+- 아래로 드래그하는 중간 프레임에서 영상이 부모와 함께 축소·이동되고 검은 사각형이나
+  분리된 레이어가 남지 않는다.
+- 완전한 아래 스와이프와 동영상 사이 좌우 전환이 정상 동작하고 앱이 충돌하지 않는다.
+
+이 에뮬레이터는 `supportedHdrTypes=[]`, `hdrSdrRatio=not_available`이라 실제 HDR 휘도와
+Samsung Gallery와의 밝기 비교는 할 수 없다. 그 최종 확인은 HDR 지원 갤럭시 실기에서 한다.
 
 ### 2.4 어댑터에 뷰 타입 도입
 

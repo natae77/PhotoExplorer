@@ -11,13 +11,17 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
+    <!--
+      SurfaceView keeps the platform HDR output path. TextureView converts HDR to SDR and made
+      Galaxy HLG/HDR videos noticeably darker than Samsung Gallery; see plan 12 section 2.3.2.
+    -->
     <androidx.media3.ui.PlayerView
         android:id="@+id/playerView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:visibility="gone"
         app:use_controller="false"
-        app:surface_type="texture_view"
+        app:surface_type="surface_view"
         app:show_buffering="never"
         app:resize_mode="fit" />
 
