@@ -13,10 +13,14 @@ import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuInflater
 import android.view.MenuItem
+import android.view.PixelCopy
+import android.view.SurfaceView
 import android.view.TextureView
 import android.view.View
 import android.view.ViewGroup
@@ -96,6 +100,8 @@ class MediaViewerFragment :
     private lateinit var adapter: MediaViewerAdapter
 
     private var playerHolder: VideoPlayerHolder? = null
+    private var renderedVideoPath: Path? = null
+    private var isPreparingReturn = false
 
     private var isSystemUiVisible = true
 
@@ -263,12 +269,56 @@ class MediaViewerFragment :
         // MediaViewerActivity.onSupportNavigateUp().
         addOnBackPressedCallback(object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                prepareReturnTransition()
-                // This callback consumed the back press, so Activity.onBackPressed() will not run
-                // and nobody else is going to start the return transition for us.
-                requireActivity().finishAfterTransition()
+                finishWithReturnTransition()
             }
         })
+    }
+
+    private fun finishWithReturnTransition() {
+        if (isPreparingReturn || isReturning) return
+        val exitActivity = requireActivity()
+        val exitView = view
+        val exitPath = currentPath
+        val surface = currentVideoBinding?.playerView?.videoSurfaceView as? SurfaceView
+        if (!hasSharedElement || surface == null || renderedVideoPath != exitPath
+            || Build.VERSION.SDK_INT < Build.VERSION_CODES.N
+            || !surface.holder.surface.isValid || surface.width <= 0 || surface.height <= 0) {
+            prepareReturnTransition()
+            exitActivity.finishAfterTransition()
+            return
+        }
+        // HDR playback uses SurfaceView. Copy its last frame before hiding/releasing the surface.
+        isPreparingReturn = true
+        playerHolder?.exoPlayer?.pause()
+        val handler = Handler(Looper.getMainLooper())
+        var completed = false
+        fun complete(drawable: Drawable?) {
+            if (completed) return
+            completed = true
+            isPreparingReturn = false
+            if (view !== exitView || exitActivity.isFinishing || exitActivity.isDestroyed) return
+            prepareReturnTransition(drawable?.takeIf { currentPath == exitPath })
+            exitActivity.finishAfterTransition()
+        }
+        val timeout = Runnable { complete(null) }
+        handler.postDelayed(timeout, 500)
+        try {
+            val frame = Bitmap.createBitmap(surface.width, surface.height, Bitmap.Config.ARGB_8888)
+            PixelCopy.request(surface, frame, { result ->
+                handler.removeCallbacks(timeout)
+                logMediaTransition("viewer surface copy: result=$result")
+                if (!completed && result == PixelCopy.SUCCESS) {
+                    complete(BitmapDrawable(resources, frame))
+                } else {
+                    frame.recycle()
+                    complete(null)
+                }
+            }, handler)
+        } catch (exception: Exception) {
+            handler.removeCallbacks(timeout)
+            logMediaTransition("viewer surface copy failed: $exception")
+            complete(null)
+        }
     }
 
     /**
@@ -278,7 +328,7 @@ class MediaViewerFragment :
      * All of it happens in one frame, right before finishAfterTransition() captures the shared
      * element.
      */
-    private fun prepareReturnTransition() {
+    private fun prepareReturnTransition(videoFrame: Drawable? = null) {
         isReturning = true
         val activity = requireActivity()
         if (!hasSharedElement) {
@@ -289,7 +339,7 @@ class MediaViewerFragment :
             return
         }
         val transitionImage = binding.transitionImage
-        val drawable = returnDrawable()
+        val drawable = videoFrame ?: returnDrawable()
         if (drawable == null) {
             // Nothing worth sending: a zoomed photo, a page still loading, or one that failed.
             // RESULT_CANCELED stops the grid from remapping, and the empty drawable is what stops
@@ -438,7 +488,10 @@ class MediaViewerFragment :
         if (transitionImage.drawable == null) {
             return
         }
-        if (currentPageContent() is PageContent.Loading && attempt < TRANSITION_IMAGE_WAIT_FRAMES) {
+        val videoReady = currentVideoBinding?.playerView?.isVisible == true
+            && renderedVideoPath == currentPath
+        if (!videoReady && currentPageContent() is PageContent.Loading
+            && attempt < TRANSITION_IMAGE_WAIT_FRAMES) {
             binding.viewPager.doOnPreDraw { hideTransitionImageWhenPageReady(attempt + 1) }
             return
         }
@@ -625,6 +678,7 @@ class MediaViewerFragment :
             return
         }
         playerView.isVisible = true
+        renderedVideoPath = null
         holder.play(path, playerView, viewModel.playbackPositions[path] ?: 0L)
         // The speed is shared by every video of the session, see spec 11 section 6.3.
         holder.exoPlayer.setPlaybackSpeed(viewModel.playbackSpeed)
@@ -677,6 +731,7 @@ class MediaViewerFragment :
         }
 
         override fun onRenderedFirstFrame() {
+            renderedVideoPath = playerHolder?.currentPath
             currentVideoBinding?.thumbnailImage?.fadeOutUnsafe()
         }
 
