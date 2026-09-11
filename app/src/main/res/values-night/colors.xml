@@ -34,7 +34,7 @@
     <color name="file_icon_yellow_back">#FFE082</color>
     <color name="file_icon_yellow_highlight">#99FFF8DC</color>
 
-    <color name="file_list_path_bar_background">#303134</color>
+    <color name="file_list_path_bar_background">#292A2D</color>
 
     <!-- Lighter and less saturated so they stay readable on a dark surface. -->
     <color name="media_date_saturday">#8AB4F8</color>

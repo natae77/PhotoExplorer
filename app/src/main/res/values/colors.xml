@@ -49,7 +49,7 @@
     <color name="file_icon_yellow_back">#FBCB43</color>
     <color name="file_icon_yellow_highlight">#80FFF3C4</color>
 
-    <color name="file_list_path_bar_background">#F1F3F4</color>
+    <color name="file_list_path_bar_background">#E9E7EE</color>
 
     <!--
       ~ Media view mode date tiles, see doc/08-media-view-mode-spec.md 4.3 (D23).

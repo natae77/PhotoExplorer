@@ -168,7 +168,7 @@ API를 추가하더라도 file list가 명시적으로 opt-in할 때만 fill을 
 - [ ] 기준 wallpaper에서 동적 색상을 끈 M3 밝음은 `#EEEDF4`와 일치한다.
 - [ ] 동적 색상을 켠 M3 밝음은 해당 팔레트에서 계산한 lifted 기대값과 일치하고 스크롤 전후 같다.
 - [ ] configuration change로 Activity가 재생성되면 새 팔레트에서 fill을 다시 resolve한다.
-- [ ] 경로 바는 밝음 `#F1F3F4`를 유지한다.
+- [ ] 경로 바는 밝음 `#E9E7EE`, 야간 `#292A2D`를 유지한다.
 - [ ] 경로 아래부터 첫 콘텐츠까지 8dp가 측정된다.
 - [ ] 선택 toolbar를 열고 닫아도 색이 튀지 않는다.
 
@@ -667,3 +667,12 @@ loader의 directory enumerator와 dispatcher를 주입 가능한 경계로 만�
 - SM-F971N의 실제 접힘↔펼침 전환, M2/동적 색 조합, 큰 글꼴, TalkBack 순회, RTL은 미확인이다.
 - SAF/SMB/SFTP/archive provider의 실패·지연·취소 무시 동작과 count 첫 화면 성능 계측은 남아 있다.
 - 배포용 release keystore를 사용한 최종 서명과 `apksigner` 검증은 남아 있다.
+
+### 16.6 경로 바 중간 톤 후속 조정
+
+- 밝은 테마 경로 바를 `#F1F3F4`에서 `#E9E7EE`로 바꿨다.
+- Pixel 8 API 36 원본 캡처에서 즐겨찾기 칩 `#E3E1E8` → 경로 바 `#E9E7EE` → 고정 상단 배경
+  `#EEEDF4` 순서로 측정되어 의도한 중간 톤을 확인했다.
+- 야간 경로 바는 `#303134`에서 `#292A2D`로 낮췄다. 같은 캡처에서 즐겨찾기 칩 `#27282D`와
+  경로 바 `#292A2D`가 가까운 단계로 보이고 기존처럼 경로 바만 밝게 뜨지 않았다.
+- `assembleDebug`, `testDebugUnitTest` 7개와 `git diff --check`가 통과했다.
