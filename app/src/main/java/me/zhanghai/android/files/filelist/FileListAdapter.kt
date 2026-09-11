@@ -27,6 +27,8 @@ import me.zhanghai.android.files.compat.foregroundCompat
 import me.zhanghai.android.files.compat.getColorCompat
 import me.zhanghai.android.files.compat.getDrawableCompat
 import me.zhanghai.android.files.compat.isSingleLineCompat
+import me.zhanghai.android.files.compat.setTransitionAlphaCompat
+import me.zhanghai.android.files.compat.setTransitionVisibilityCompat
 import me.zhanghai.android.files.databinding.FileItemGridBinding
 import me.zhanghai.android.files.databinding.FileItemListBinding
 import me.zhanghai.android.files.databinding.FileItemMediaBinding
@@ -46,7 +48,6 @@ import me.zhanghai.android.files.ui.CheckableItemBackground
 import me.zhanghai.android.files.util.isMaterial3Theme
 import me.zhanghai.android.files.util.layoutInflater
 import me.zhanghai.android.files.util.valueCompat
-import me.zhanghai.android.files.viewer.media.mediaTransitionName
 import java.text.SimpleDateFormat
 import java.time.DayOfWeek
 import java.time.Instant
@@ -346,6 +347,13 @@ class FileListAdapter(
         }
     }
 
+    override fun onViewRecycled(holder: RecyclerView.ViewHolder) {
+        if (holder is ViewHolder) {
+            holder.sharedElementImage?.let(::resetSharedElementImage)
+        }
+        super.onViewRecycled(holder)
+    }
+
     private fun bindDateViewHolder(
         holder: DateViewHolder,
         item: FileListItem.Date,
@@ -456,10 +464,9 @@ class FileListAdapter(
         holder.thumbnailImage.apply {
             dispose()
             setImageDrawable(null)
-            // Only media tiles take part in the shared element transition. bindFileViewHolder() is
-            // shared by all three view types, so this has to be cleared for the other two rather
-            // than merely left unset. See plan 18 section 3.2.3.
-            transitionName = if (isMedia) mediaTransitionName(path) else null
+            // The real thumbnail is never a shared element. A dedicated carrier in the media tile
+            // owns all framework transition state, see plan 18 section 3.4.8.
+            transitionName = null
             val shouldLoadThumbnail = supportsThumbnail && !shouldLoadThumbnailIcon
             isVisible = shouldLoadThumbnail
             alpha = if (isMedia && listener.shouldHideMediaThumbnail(path)) 0f else 1f
@@ -479,6 +486,7 @@ class FileListAdapter(
                 }
             }
         }
+        holder.sharedElementImage?.let(::resetSharedElementImage)
         holder.appIconBadgeImage?.apply {
             dispose()
             setImageDrawable(null)
@@ -585,6 +593,17 @@ class FileListAdapter(
                 }
                 else -> false
             }
+        }
+    }
+
+    private fun resetSharedElementImage(imageView: ImageView) {
+        imageView.apply {
+            setImageDrawable(null)
+            transitionName = null
+            isVisible = true
+            alpha = 1f
+            setTransitionAlphaCompat(1f)
+            setTransitionVisibilityCompat(View.VISIBLE)
         }
     }
 
@@ -716,6 +735,7 @@ class FileListAdapter(
         val thumbnailOutlineView: View?,
         val thumbnailIconImage: ImageView?,
         val thumbnailImage: ImageView,
+        val sharedElementImage: ImageView?,
         val appIconBadgeImage: ImageView?,
         val badgeImage: ImageView?,
         val nameText: TextView,
@@ -736,6 +756,7 @@ class FileListAdapter(
             null,
             null,
             binding.thumbnailImage,
+            null,
             binding.appIconBadgeImage,
             binding.badgeImage,
             binding.nameText,
@@ -752,6 +773,7 @@ class FileListAdapter(
             binding.thumbnailOutlineView,
             binding.thumbnailIconImage,
             binding.thumbnailImage,
+            null,
             binding.appIconBadgeImage,
             binding.badgeImage,
             binding.nameText,
@@ -768,6 +790,7 @@ class FileListAdapter(
             null,
             binding.thumbnailIconImage,
             binding.thumbnailImage,
+            binding.sharedElementImage,
             null,
             null,
             binding.nameText,

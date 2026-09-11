@@ -35,8 +35,10 @@ object MediaViewerViewportCoordinator {
         val preparation: Preparation
     )
 
-    fun interface FileListListener {
+    interface FileListListener {
         fun onViewportRequested(request: Request)
+
+        fun onViewerEnterFinished()
     }
 
     fun interface ViewerListener {
@@ -47,6 +49,7 @@ object MediaViewerViewportCoordinator {
         var nextSequence = 0L
         var request: Request? = null
         var status: Status? = null
+        var viewerEnterFinished = false
         var fileListListener: WeakReference<FileListListener>? = null
         var viewerListener: WeakReference<ViewerListener>? = null
     }
@@ -59,6 +62,9 @@ object MediaViewerViewportCoordinator {
         val session = sessions.getOrPut(sessionId, ::Session)
         session.fileListListener = WeakReference(listener)
         session.request?.let(listener::onViewportRequested)
+        if (session.viewerEnterFinished) {
+            listener.onViewerEnterFinished()
+        }
     }
 
     fun unregisterFileList(sessionId: String, listener: FileListListener) {
@@ -117,6 +123,14 @@ object MediaViewerViewportCoordinator {
     }
 
     fun isLatest(request: Request): Boolean = sessions[request.sessionId]?.request == request
+
+    fun notifyViewerEnterFinished(sessionId: String) {
+        val session = sessions[sessionId] ?: return
+        if (session.viewerEnterFinished) return
+        session.viewerEnterFinished = true
+        session.fileListListener?.get()?.onViewerEnterFinished()
+        logMediaTransition("viewer enter finished: session=$sessionId")
+    }
 
     /** Replays the latest request after the file list data or layout has changed. */
     fun invalidateFileList(sessionId: String) {

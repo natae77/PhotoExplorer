@@ -46,6 +46,19 @@
             android:scaleType="centerCrop" />
 
         <!--
+          ~ Dedicated shared-element carrier. It is normally visible but has no drawable, so the
+          ~ framework can capture it without sharing transition state with the real thumbnail.
+          -->
+        <ImageView
+            android:id="@+id/sharedElementImage"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clickable="false"
+            android:focusable="false"
+            android:importantForAccessibility="no"
+            android:scaleType="centerCrop" />
+
+        <!--
           ~ Selection scrim. Must sit above the thumbnail: the thumbnail fills the whole tile, so
           ~ the checked *background* used by the list and grid modes would be hidden behind it.
           -->

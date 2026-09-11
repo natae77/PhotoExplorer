@@ -3,15 +3,16 @@
 미디어 모드에서 사진을 열면 **타일이 커지면서 뷰어가 되고**, 뷰어를 닫으면
 **미디어가 원래 타일 자리로 줄어들며 들어간다.** 지금의 좌우 슬라이드를 대체한다.
 
-- 작성일: 2026-09-04 / 최종 개정: **2026-09-12 (11차)**
+- 작성일: 2026-09-04 / 최종 개정: **2026-09-12 (12차)**
 - 프로젝트: **PhotoExplorer** (`natae77/PhotoExplorer`, `zhanghai/MaterialFiles` fork)
 - 기준 소스: `feature/media-view-mode` (`8c3e67d2` 시점)
-- 상태: **11차 최초 타일 빈칸·깜박임 핵심 경로 구현 및 3인 검토 보완 계획 반영**
+- 상태: **12차 표시용 썸네일과 공유 요소 View 분리 구현 완료 / 에뮬레이터 핵심 경로 검증 완료**
 
 **개정 이력** — 이 문서는 개정할 때 새 문서를 만들지 않고 **본문을 직접 고친다.**
 
 | 개정 | 날짜 | 무엇이 바뀌었나 |
 |---|---|---|
+| 12차 | 2026-09-12 | 하나의 `thumbnailImage`가 폴더 표시와 공유 요소 운반을 함께 맡던 구조를 분리했다. 3인 검토를 반영해 carrier 상태표, 독립 Drawable wrapper, enter ACK, original-name 단일 소유, return holder lease와 terminal cleanup을 확정하고 구현했다. Pixel 8 API 36 에뮬레이터에서 A를 열어 B로 넘긴 뒤 swipe-down하는 핵심 경로와 빌드·단위 테스트를 확인했다 |
 | 11차 | 2026-09-12 | A에서 열어 B로 넘긴 뒤 복귀하면 최초 타일 A가 빈칸으로 남거나 한 번 깜박이는 결함을 실제 구현에 맞춰 반영했다. 일반 `alpha`와 별개인 `transitionAlpha`를 포함해 프레임워크가 조작한 표시 상태를 정상화하고, B로 반환할 때 A의 `transitionName`을 잠시 떼어 후속 탐색·캡처에서 A가 다시 선택되지 않게 한다. 3인 검토 결과 반환 transition 종료 훅과 RecyclerView 재활용 정규화가 후속 구현으로 남았다 |
 | 10차 | 2026-09-12 | 좌우 이동 후 swipe-down 첫 프레임에 최초 타일이 비어 있다가 반환 직전에 현재 타일과 빈칸이 교환되는 결함을 반영했다. 최신 타일 READY 전에 최초/직전 타일을 복원하고 현재 썸네일만 숨겨, 폴더를 드러내기 전에 빈칸을 현재 위치로 옮기도록 했다 |
 | 9차 | 2026-09-11 | 에뮬레이터에서 최초 타일 A로 연 뒤 B로 넘겨 swipe-down하면 복귀 애니메이션이 끊기는 결함을 재현했다. 최초 `ActivityOptions`의 이름 A를 B로 바꿔 버린 caller callback이 원인이므로 **이름은 끝까지 A로 유지하고 대상 View만 B 타일로 교체**하도록 바로잡았다. 페이지 IDLE 때 아래 폴더를 현재 타일 위치로 미리 스크롤하는 세션·sequence number·pre-draw READY 계획과 레이스/폴백 검증을 추가했다 |
@@ -481,9 +482,115 @@ callback 이후의 이름 재탐색·재호출·capture에서 A가 다시 선택
 - A로 다시 넘겨 A에 반환하는 경우에는 이름을 떼지 않는다.
 
 사용자에게 보이는 순서는 **B READY 교환 → 폴더 첫 노출 → UP 닫힘 확정 → 반환 매핑 → reenter
-transition 종료/cancel → 세션 정리**다. 현재 코드는 API 36의 A→B swipe-down 핵심 경로에서 빈칸과
-깜박임을 없앴다. 위의 명시적 transition 종료 훅과 holder 재활용 정규화는 3인 검토에서 확인된
-후속 구현 항목이다.
+transition 종료/cancel → 세션 정리**다. 12차 구현에서는 실제 썸네일이 공유 요소 상태를 갖지 않으므로
+이 절의 A 이름 탈착과 실제 썸네일 전환 상태 복구는 제거했다. 명시적 transition 종료 훅과 반환 대상
+holder lease는 §3.4.8의 전용 운반 View에 적용한다.
+
+#### 3.4.8 구조 개선 — 표시용 썸네일과 공유 요소 View를 분리한다 (12차, 구현 완료)
+
+현재 미디어 타일의 `thumbnailImage`는 두 주체가 동시에 소유한다.
+
+- 폴더 화면은 이 View를 실제 썸네일로 표시하고, 현재 뷰어 페이지의 자리만 비우기 위해 일반
+  `alpha`를 제어한다.
+- Android 공유 요소 프레임워크는 같은 View의 `transitionName`, `transitionAlpha`, visibility flag와
+  overlay 수명을 제어한다.
+
+RecyclerView는 이 View를 다른 경로에 재사용한다. 따라서 §3.4.7처럼 프레임워크가 남긴 상태를
+경로·세션·holder 수명과 맞춰 수동으로 복구해야 하고, 반환 종료 시점이나 bind 한 번만 놓쳐도 빈칸,
+깜박임 또는 다음 열기 실패로 이어진다. 기존 coordinator·선행 스크롤·original-name 매핑은 유지하되,
+타일 안의 역할을 다음처럼 분리한다.
+
+| View | 소유자 | 평상시 역할 | 제어 상태 |
+|---|---|---|---|
+| `thumbnailImage` | 폴더/viewport 로직 | 사용자가 실제로 보는 썸네일 | 현재 경로의 빈칸을 위한 일반 `alpha`만 제어. `transitionName` 없음 |
+| `sharedElementImage` (신규) | 앱은 준비 상태, 프레임워크는 ghost/overlay 수명 | 열기·닫기 전환의 위치·크기·그림 운반 | drawable·name·전환 기본값. 클릭·접근성 대상 아님 |
+
+`sharedElementImage`는 `thumbnailImage`와 같은 bounds, `centerCrop`, outline/clip 조건을 사용해 두 View의
+시작·종료 사각형이 완전히 같아야 한다. z-order는 `thumbnailImage` 바로 위, selection overlay·메뉴
+scrim·동영상 배지·메뉴보다 아래다. 별도 Coil 요청과 bitmap decode는 만들지 않지만, **같은 Drawable
+인스턴스를 두 ImageView에 직접 설정하지 않는다.** Drawable은 callback·bounds·state·level을 가지므로
+`constantState?.newDrawable(resources)?.mutate()`처럼 View별 wrapper를 만들고 상태를 복사하되 내부
+bitmap만 공유한다. 안전하게 복제할 수 없으면 소프트웨어 snapshot을 만들고, 그것도 실패하면 공유 요소
+전환을 일반 종료로 폴백한다.
+
+운반 View는 보이지 않게 만들려고 `INVISIBLE`이나 alpha 0으로 두지 않는다. 둘 다 target capture 또는
+최종 alpha를 깨뜨릴 수 있다. **그림이 없는 VISIBLE View**를 평상시 기준으로 삼는다.
+
+| 단계 | 실제 `thumbnailImage` | `sharedElementImage` |
+|---|---|---|
+| idle | alpha 1, name 없음 | `VISIBLE`, alpha 1, `transitionAlpha` 1, drawable/name 없음 |
+| A 진입 준비 | alpha 0 | 독립 drawable + original name A, alpha/`transitionAlpha` 1 |
+| enter 완료 ACK | 현재 경로 A이므로 alpha 0 유지 | idle로 원자적 초기화 |
+| B `REVEAL_READY`·드래그·취소 | B만 alpha 0 | 모든 carrier가 idle — B에도 drawable/name을 미리 넣지 않음 |
+| B return map 성공 | B alpha 0 | B에만 독립 drawable + original name A, holder lease |
+| reenter 종료/cancel cleanup | B alpha 1 | B를 idle로 원자적 초기화하고 lease 해제 |
+
+original name A는 세션 데이터에 보관하고, attach된 carrier 중 **동시에 하나만** 갖는다. enter 종료 때
+A carrier에서 제거하고 return map 때 B carrier에만 설정하며 cleanup에서 다시 제거한다. 평상시 carrier는
+경로별 name도 갖지 않는다. viewport의 `REVEAL_READY`는 위치·attach만 뜻하고 drawable 준비와 섞지
+않는다. B drawable이 없어도 폴더 선노출은 허용하되, UP 시점에도 운반용 그림을 만들 수 없으면
+`caller target drawable 없음`으로 기록하고 names/map을 비워 일반 반환으로 폴백한다. 이는 뷰어 페이지
+그림이 없는 F5와 별도 원인이다.
+
+**진입 순서**
+
+1. 사용자가 A를 누르면 A의 `sharedElementImage`에 현재 drawable과 original name A를 설정하고
+   layout·attach 상태를 확인한다.
+2. 같은 프레임에 실제 `thumbnailImage(A)`의 일반 alpha를 0으로 만들고 전환 운반 View만
+   `ActivityOptions.makeSceneTransitionAnimation()`에 넘긴다. 준비가 안 되면 실제 썸네일을 즉시 복원하고
+   일반 열기로 폴백한다.
+3. destination의 `sharedElementEnterTransition.onTransitionEnd/onTransitionCancel`이 기존 session
+   coordinator로 `ENTER_FINISHED(sessionId)` ACK를 보낸다. caller는 ACK를 받아 A carrier만 idle로
+   초기화한다. 실제 A 썸네일은 여전히 현재 뷰어 페이지 자리이므로 `currentHiddenPath`에 따라 alpha 0을
+   유지하고, B로 이동해 B가 READY가 되거나 세션이 끝날 때 복원한다. 즉시 복귀·view 파괴는 session과
+   viewer 생존 상태를 확인하는 idempotent cleanup으로 끝낸다.
+
+**페이지 이동과 폴더 선노출**
+
+1. A→B가 IDLE이면 기존 coordinator가 B를 화면 안으로 스크롤하고 pre-draw READY를 기다린다.
+2. READY 직전에 실제 A 썸네일을 표시하고 실제 B 썸네일만 일반 alpha 0으로 만든다.
+   B의 `sharedElementImage`는 drawable/name이 없는 idle 상태로 둔다.
+3. 이 교환 뒤에만 검정 window background를 낮춘다. 따라서 첫 폴더 노출 프레임은 A가 채워지고 B의
+   실제 썸네일 자리만 비어 있다.
+4. 드래그를 취소해도 carrier는 idle이다. 그 뒤 B→C/A로 넘기면 기존 hidden path B를 복원하고 최신
+   C/A READY만 적용하므로 이전 B의 운반 그림이 나타날 수 없다.
+
+**반환 순서**
+
+1. 종료 결과의 B tile/holder/carrier, original name A와 독립 drawable 생성 가능 여부를 먼저 검증한다.
+2. 성공한 `onMapSharedElements` 호출 안에서만 B carrier에 drawable과 A 이름을 설정하고
+   `sharedElements[originalNameA] = sharedElementImage(B)`로 매핑한다. callback 반환 뒤 target capture와
+   framework hide 사이에 일반 draw가 끼지 않는지 검증하며, 보장되지 않는 기기에서는 return을
+   postpone하고 같은 pre-draw에서 준비·capture한다. 실패 시 carrier를 즉시 idle로 되돌리고 names/map을
+   비운다.
+3. 성공 매핑 순간 B holder에 `setIsRecyclable(false)`, carrier에 transient state를 주어 reenter
+   transition 종료까지 lease한다. map 이전 detach/list mutation은 폴백하고, map 이후에는 pinned carrier로
+   전환을 마친다.
+4. reenter overlay가 B로 들어가는 동안 실제 A는 계속 보이고 실제 B만 숨겨 둔다.
+5. `FileListActivity.onActivityReenter`에서 시작 전에 `window.sharedElementReenterTransition` listener를
+   한 번 등록한다. `onTransitionCancel`은 terminal 상태만 기록하고, 뒤따르는 `onTransitionEnd` 또는
+   제한 시간 fallback이 실제 cleanup을 한 번만 수행한다. transition이 null이거나 시작되지 않은
+   `ReturnBlocked`/map 실패는 즉시 cleanup한다.
+6. cleanup은 decor의 다음 traversal 전에 하나의 runnable에서 carrier의 drawable/name/전환 상태를
+   idle로 바꾸고 실제 B alpha를 1로 만들며 holder lease를 해제한다. 두 변경 사이에는 draw가 없어야 한다.
+   Activity Result 수신은 종료 요청과 target path 저장에만 사용한다.
+
+**RecyclerView와 상태 소유권**
+
+- adapter bind/recycle은 실제 썸네일의 일반 alpha와 운반 View의 drawable/name/전환 상태를 각각
+  초기화한다. 운반 View에 남은 프레임워크 상태가 다른 경로의 실제 썸네일로 이동할 수 없다.
+- 세션에는 `openingPath`, `currentHiddenPath`, original name과 반환 단계를 보관한다. 평상시에는 View를
+  경로로 다시 찾고, 성공 return map 뒤에만 B holder/carrier lease를 짧게 보관한다.
+- transition cancel/end 중복, timeout, view 파괴, 새 뷰어 실행은 `terminalHandled` 1회 가드를 둔 같은
+  cleanup으로 끝낸다. 첫 12차 bind에서는 11차가 실제 썸네일에 남겼을 수 있는 transition 상태를
+  1/VISIBLE로 한 번 정상화한 뒤, 이후에는 실제 썸네일에 전환 setter를 호출하지 않는다.
+- 운반 View는 포커스·클릭·접근성·메뉴·배지를 소유하지 않는다. 타일 입력은 기존 item View가 받는다.
+
+이 분리는 §3.4.7의 `thumbnailImage` 전환 상태 강제 복원과 A의 `transitionName` 탈착을 제거하기 위한
+구조 개선이다. 제거되는 것은 **실제 thumbnail의** 전환 상태 강제 복원과 이름 탈착뿐이다. 명시적인
+enter ACK·reenter 종료 훅, 현재 B 썸네일의 일반 alpha 관리, original-name 프로토콜과 폴백은 여전히
+필요하다. 12차 구현에서 진입과 반환 대상을 함께 carrier로 바꾸고 11차의 실제 썸네일 전환 상태
+복원·이름 탈착 코드를 제거했다. source와 target이 서로 다른 종류의 View를 쓰는 중간 상태는 만들지 않았다.
 
 ### 3.5 현재 페이지의 상태를 **한 곳에서** 묻는다
 
@@ -856,6 +963,27 @@ ANDROID_HOME="C:\Users\hskang\AppData\Local\Android\Sdk" JAVA_HOME="/c/Program F
 - 전환 시간, 인터폴레이터. 기본값(`move`, 300ms 남짓)으로 충분한지 본다.
 - 필요하면 `windowSharedElementEnterTransition` / `...ReturnTransition` 을 테마에 명시한다.
 
+### 13단계 (완료) — 타일의 표시 View와 공유 요소 View 분리
+- `file_item_media.xml`에서 기존 `thumbnailImage`와 같은 bounds·clip·`centerCrop`을 갖는
+  `sharedElementImage`를 겹쳐 추가한다. 입력·접근성 대상에서는 제외한다.
+- `transitionName`과 ActivityOptions/return map 대상을 모두 `sharedElementImage`로 옮긴다. 실제
+  `thumbnailImage`에는 transition name을 두지 않는다.
+- 운반 View의 idle은 `VISIBLE + alpha/transitionAlpha 1 + drawable/name 없음`으로 고정한다. 별도 이미지
+  로드는 하지 않고, 진입 직전과 성공 return map callback 안에서만 독립 Drawable wrapper를 만든다.
+  B READY와 swipe-down 취소 상태에는 운반 drawable을 두지 않는다.
+- adapter bind/recycle에서 두 View의 상태를 따로 초기화한다. 실제 썸네일에는 세션의 current hidden
+  path만, 운반 View에는 drawable/name/transition 기본값만 적용한다.
+- viewer enter 종료/cancel ACK와 caller reenter transition listener를 추가한다. Activity Result는 경로
+  전달, terminal callback은 실제 썸네일·운반 View·lease·세션의 idempotent cleanup을 담당한다.
+- 성공 return map부터 terminal cleanup까지 B holder/carrier를 재활용 불가 상태로 lease한다. map 전
+  detach는 폴백하고 map 후에는 pinned carrier로 마친다.
+- layout·adapter·진입·반환 대상을 한 작업에서 carrier 구조로 바꾸고, §3.4.7의 실제 썸네일 transition
+  상태 복원과 A 이름 탈착 호환 코드를 제거했다.
+- **확인**: A 열기, A→B swipe-down/뒤로가기/화살표, A→B drag 취소→C→재시도,
+  A→B drag 취소→A→닫기, 화면 밖 B, 반환 중 holder recycle과 transition cancel/null을 화면 녹화와
+  단계별 상태 로그로 비교한다. 실제 썸네일에는 초기 migration 정규화 뒤 전환 상태가 기록되지 않아야
+  하며, original name carrier는 언제나 하나뿐이어야 한다.
+
 ## 5. 검증
 
 현재 `app/src/test`가 있으므로 임계값·방향·거리 판정은 가능한 범위에서 단위 테스트한다.
@@ -942,6 +1070,12 @@ ANDROID_HOME="C:\Users\hskang\AppData\Local\Android\Sdk" JAVA_HOME="/c/Program F
     닫아도 B로 정상 반환한다. 반환 overlay가 B에 도착할 때까지 A는 숨거나 깜박이지 않고 B의 실제
     썸네일은 나타나지 않는다. reenter transition 종료 다음 프레임에는 A와 B가 모두 채워지고 A 이름이
     복구된다. 이후 B→A로 되돌려 닫기, A 다시 열기, 반환 중 holder rebind/recycle도 정상이어야 한다.
+25. 12차 구조를 구현한 뒤에는 실제 `thumbnailImage`에 `transitionName`이나 1이 아닌
+    `transitionAlpha`가 설정되지 않는다. 첫 bind에서 11차 잔여 상태를 1/VISIBLE로 정규화한 이후
+    프레임워크는 실제 썸네일을 건드리지 않는다. 폴더 선노출·취소 중 모든 carrier는 drawable이 없고,
+    return map에서만 B carrier가 준비된다. 반환 overlay의 마지막 프레임 다음 첫 폴더-only 프레임에는
+    운반 그림 없이 B 실제 썸네일만 채워져 중복이나 빈 프레임이 없다. 취소→페이지 이동→재시도와 holder
+    recycle에도 이전 경로의 drawable/name이 나타나지 않으며 기존 1~24의 화면 결과는 같아야 한다.
 
 ### 5.4 검증 결과 (5차)
 
@@ -1110,22 +1244,32 @@ A→B→A, A→B→C, 화면 밖 B, swipe-down 취소·재시도, 뒤로가기·
 return callback 2회, transition cancel/null, 반환 중 notify/rebind/recycle과 회전을 포함한다. API 23과
 API 28에서는 reflection 성공·크래시 없음·최종 alpha/visibility를 각각 확인한다.
 
+### 5.10 표시용 썸네일·공유 요소 View 분리 검증 (12차)
+
+2026-09-12 Pixel 8 API 36 에뮬레이터의 `MixTest`에서 `photo_1`을 열고 `photo_2`로 넘긴 뒤
+swipe-down했다. enter 종료 ACK 뒤 A carrier가 idle로 돌아갔고, B READY에서 실제 A 썸네일을 복원하고
+실제 B 썸네일만 숨겼다. 반환 callback은 original name A를 B carrier에 매핑했고, reenter transition
+terminal callback에서 B 썸네일·carrier·holder lease·세션을 정리했다. 반환 완료 캡처에서 A와 B 타일이
+모두 채워진 것을 확인했으며 AndroidRuntime 오류는 없었다. `assembleDebug`와 `testDebugUnitTest`가
+통과했다. 뒤로가기·위 화살표, 취소→재시도, 회전, API 23·28과 실기기 프레임 검증은 남아 있다.
+
 ## 6. 바뀌는 파일
 
 | 파일 | 변경 | 단계 |
 |---|---|---|
 | `viewer/media/MediaTransition.kt` | **신규** — 이름 규칙만 | 2 |
-| `viewer/media/MediaViewerViewportCoordinator.kt` | **신규** — 내부 MEDIA 세션별 sequence number·최신 path와 READY/UNAVAILABLE 전달·replay·정리 | 8 |
+| `viewer/media/MediaViewerViewportCoordinator.kt` | **신규** — 내부 MEDIA 세션별 sequence number·최신 path와 READY/UNAVAILABLE 전달·replay·정리. 13단계에서 viewer enter 종료/cancel ACK 추가 | 8·13 |
 | `res/values/themes.xml`·`themes_material3.xml` | `windowActivityTransitions` 명시, 7차에서 기존 Immersive base에 `windowIsTranslucent=true` 추가. 검정 background 유지 | 1·10 |
-| `compat/ViewCompat.kt` | 공유 요소 `transitionAlpha`와 전환용 setter를 통한 visibility flag 정상화 호환 함수. API 29 이상 직접 호출, API 23~28 reflection | 8·11 |
-| `filelist/FileListAdapter.kt` | `transitionName` 설정/해제, `filePositionMap` 읽기용 접근자. 11차 후속으로 bind/recycle 때 transition 상태 기본값과 세션의 A 이름 분리·B 일반 alpha 상태 재적용 | 2·11 |
-| `filelist/FileListFragment.kt` | 미디어 모드 사진 라우팅, session 등록·복원, adapter/layout 변화 시 READY 무효화·재검증, 현재 경로 선행 스크롤·pre-draw ACK, 삼상태 return mapping과 original name 유지, 현재 빈칸과 최초 경로의 분리, 최초 타일 전환 상태·이름 복원, 최종 복귀 가드·스크롤 | 3·5·7·8·10·11 |
-| `viewer/media/MediaViewerActivity.kt` | `fragment` 필드, `onSupportNavigateUp()`, **enter 콜백 등록**, 내부 진입 extra와 검정 window background 알파 API | 4·5·10 |
+| `compat/ViewCompat.kt` | 공유 요소 `transitionAlpha`와 전환용 setter를 통한 visibility flag 정상화 호환 함수. API 29 이상 직접 호출, API 23~28 reflection. 13단계에서는 carrier baseline 초기화에만 사용하고 실제 썸네일 호환 처리는 제거 | 8·11·13 |
+| `res/layout/file_item_media.xml` | 실제 `thumbnailImage`와 같은 geometry의 비입력 `sharedElementImage` 추가 | 13 |
+| `filelist/FileListAdapter.kt` | `filePositionMap` 읽기용 접근자. 실제 썸네일의 current-hidden alpha와 운반 View의 drawable/name/transition 기본 상태를 분리해 bind | 2·11·13 |
+| `filelist/FileListFragment.kt` | 미디어 모드 사진 라우팅, session 등록·복원, adapter/layout 변화 시 READY 무효화·재검증, 현재 경로 선행 스크롤·pre-draw ACK, 삼상태 return mapping과 original name 유지. 13단계에서 carrier lookup/map, Drawable wrapper, enter ACK 처리, B holder lease와 terminal cleanup 구현 | 3·5·7·8·10·11·13 |
+| `viewer/media/MediaViewerActivity.kt` | `fragment` 필드, `onSupportNavigateUp()`, **enter 콜백 등록**, 내부 진입 extra와 검정 window background 알파 API, enter 종료/cancel ACK 전달 | 4·5·10·13 |
 | `viewer/media/MediaViewerFragment.kt` | 종료 훅·상태기·입력 잠금, IDLE path 요청과 READY gate, `isReturning`, `hasSharedElement`, `currentPageContent()`, `transitionImage`, 드래그 변형·배경 제어, `PixelCopy` | 4·5·6·8·9·10 |
 | `viewer/media/MediaViewerAdapter.kt` | **`allowHardware(false)` 두 줄만** (§3.5.1, D24) | 5 |
 | `viewer/media/SwipeDownDismissLayout.kt` | 이동량 임계값과 폴더 READY 시작 조건, 누적 이동량 따라잡기, UP 실제 이동량 판정, 멀티터치 거부, 배경용 진행·취소 콜백 | 10 |
 | `res/layout/media_viewer_fragment.xml` | `transitionImage` 추가. 별도 스크림 View는 추가하지 않음 | 5 |
-| `filelist/FileListActivity.kt` | `onActivityReenter` 전달 (+ `isInitialized` 가드) | 7 |
+| `filelist/FileListActivity.kt` | `onActivityReenter` 전달 (+ `isInitialized` 가드). 13단계에서 reenter listener 등록과 terminal cleanup 전달 | 7·13 |
 
 5차까지는 `SwipeDownDismissLayout.kt`를 건드리지 않았지만, 7차에서는 시작 임계값 뒤 누적 이동량을
 따라잡고 창 배경 알파용 진행 상태를 전달해야 하므로 변경했다. 확대 판정은 기존처럼 뷰에서 직접 읽는다.
@@ -1158,6 +1302,12 @@ API 28에서는 reflection 성공·크래시 없음·최종 alpha/visibility를 
 | coordinator가 파괴된 Fragment를 잡거나 복수 task 상태를 섞는다 | 높음 | 실행별 session token, lifecycle unregister·약한 owner, saved state 재등록/replay, 종료 시 세션 제거. 전역 current activity 금지 |
 | A→B 반환에서 최초 이름 A를 가진 원본 View가 다시 숨거나 깜박인다 | 높음 | 최초 경로를 별도 보존하고 유효한 반환 매핑 직전에 A 이름을 잠시 떼며 표시 상태를 정상화. Activity Result가 아니라 reenter transition 종료/cancel에서 이름 복구. A→B·A→B→A를 프레임 단위 확인 (§3.4.7) |
 | 반환 중 A holder가 detach/recycle되어 이름 분리나 전환 상태 복원이 다른 타일로 이동한다 | 높음 | transition 종료까지 A 경로·분리 상태를 유지하고 adapter bind/recycle/attach에서 기본 상태와 세션 예외를 재적용. cached holder position 무효화와 반환 중 notify 회귀 확인 (§3.4.7) |
+| 실제 썸네일과 운반 View의 drawable·bounds·clip이 달라 전환 시작/끝에서 한 프레임 튄다 | 중 | 같은 layout geometry와 `centerCrop`을 사용하고 별도 decode 없이 동일 콘텐츠의 독립 Drawable wrapper를 만든다. 진입·반환의 첫/마지막 프레임을 녹화 비교 (§3.4.8) |
+| 같은 Drawable 인스턴스의 callback·bounds·state가 두 ImageView 사이에서 충돌한다 | 높음 | 같은 객체 직접 공유 금지. constant state 기반 독립 wrapper 또는 software snapshot, 둘 다 불가하면 일반 폴백 (§3.4.8) |
+| 성공 매핑 뒤 B holder가 recycle되어 carrier가 사라진다 | 높음 | return map 성공부터 terminal cleanup까지 holder 재활용 금지 + carrier transient state lease. map 전 detach는 폴백, map 후에는 pinned carrier로 완료 (§3.4.8) |
+| viewer enter 완료 ACK가 유실돼 A carrier에 그림·이름이 남는다 | 높음 | sessionId가 같은 end/cancel ACK만 수락하고 view 파괴·새 세션에서 idempotent cleanup. 즉시 복귀와 ACK 지연을 별도 검증 (§3.4.8) |
+| reenter transition이 null/미시작이거나 cancel 뒤 end가 없어 B가 계속 비어 있다 | 높음 | listener 선등록, `terminalHandled` 1회 가드, null/ReturnBlocked/map 실패 즉시 cleanup, cancel 뒤 제한 시간 fallback (§3.4.8) |
+| 타일마다 ImageView가 하나 늘어 draw/메모리 비용이 커진다 | 중 | 추가 decode·request는 금지하고 idle carrier는 drawable을 비운다. 화면에 attach된 holder 수 기준으로 overdraw와 스크롤 frame time을 전후 비교 (§3.4.8) |
 
 ## 부록. 확정된 결정 기록
 
@@ -1195,3 +1345,4 @@ API 28에서는 reflection 성공·크래시 없음·최종 alpha/visibility를 
 | D30 | 좌우 이동 후 공유 요소 이름을 현재 경로로 바꿀 것인가 (9차) | **바꾸지 않는다.** 최초 ActivityOptions 이름은 불변 프로토콜 키이고 현재 경로는 대상 View 선택에만 쓴다. 성공 callback은 `sharedElements[originalName] = currentTile`만 한다 (§3.2·§3.4.6) |
 | D31 | 좌우 이동 뒤 어느 타일을 비울 것인가 (10차) | **현재 타일만 비운다.** 최신 타일이 READY 되기 전에 최초/직전 타일을 복원하고 현재 썸네일을 숨긴 뒤에만 폴더 선노출을 허용한다 (§3.4.3) |
 | D32 | 현재 타일 B로 반환할 때 최초 타일 A의 공유 요소 상태를 어떻게 할 것인가 (11차) | **유효한 B 매핑을 만들 때만 A View를 잠시 분리하고 표시 상태를 정상화한다.** 프로토콜 키 A는 유지한다. A 이름과 B 빈칸은 Activity Result 수신이 아니라 reenter transition 종료/cancel 뒤 복구하며, holder 재활용에도 같은 세션 상태를 재적용한다 (§3.4.7) |
+| D33 | 폴더에 보이는 썸네일과 공유 요소 운반 View를 계속 하나로 둘 것인가 (12차) | **분리한다.** 실제 `thumbnailImage`는 폴더 표시와 current hidden alpha만 맡는다. 신규 `sharedElementImage`는 앱이 drawable/name/기본 상태를 준비하고, 프레임워크가 ghost/overlay 수명을 소유한다. original name은 한 carrier에만 존재하도록 구현했다 (§3.4.8, 13단계) |

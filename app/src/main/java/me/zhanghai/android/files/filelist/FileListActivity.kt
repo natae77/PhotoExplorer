@@ -8,6 +8,8 @@ package me.zhanghai.android.files.filelist
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.transition.Transition
+import android.transition.TransitionListenerAdapter
 import android.view.KeyEvent
 import android.view.View
 import androidx.activity.result.contract.ActivityResultContract
@@ -48,6 +50,33 @@ class FileListActivity : AppActivity() {
         // We can be reached after being destroyed and recreated, and onCreate() may not have run.
         if (!::fragment.isInitialized) {
             return
+        }
+        val reenterTransition = window.sharedElementReenterTransition
+        if (reenterTransition != null) {
+            reenterTransition.addListener(object : TransitionListenerAdapter() {
+                private var handled = false
+
+                private fun dispatchTerminal(transition: Transition) {
+                    if (handled) return
+                    handled = true
+                    transition.removeListener(this)
+                    window.decorView.post {
+                        if (::fragment.isInitialized) {
+                            fragment.onMediaReturnTransitionTerminal()
+                        }
+                    }
+                }
+
+                override fun onTransitionEnd(transition: Transition) {
+                    dispatchTerminal(transition)
+                }
+
+                override fun onTransitionCancel(transition: Transition) {
+                    dispatchTerminal(transition)
+                }
+            })
+        } else {
+            window.decorView.post { fragment.onMediaReturnTransitionTerminal() }
         }
         fragment.onMediaViewerReenter(resultCode, data)
     }

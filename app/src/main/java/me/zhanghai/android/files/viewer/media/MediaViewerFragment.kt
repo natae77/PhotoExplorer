@@ -298,7 +298,14 @@ class MediaViewerFragment :
             registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
                 override fun onPageSelected(position: Int) {
                     (activity as? MediaViewerActivity)?.setViewerBackgroundAlpha(1f)
-                    viewportStatus = null
+                    val selectedPath = paths.getOrNull(position)
+                    // IDLE can synchronously publish READY before ViewPager2 delivers page
+                    // selection. Keep that status when it already belongs to this selected page;
+                    // clearing it here would disable swipe-down until another horizontal gesture
+                    // produces a second IDLE callback.
+                    if (viewportStatus?.request?.path != selectedPath) {
+                        viewportStatus = null
+                    }
                     // Do not start here. Fast flinging fires this for every page passed, and each
                     // one would briefly play sound. See spec 11 section 5.1.
                     stopPlaybackIfPageChanged()

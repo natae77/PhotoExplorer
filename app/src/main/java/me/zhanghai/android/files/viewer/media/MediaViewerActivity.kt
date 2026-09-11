@@ -27,6 +27,7 @@ class MediaViewerActivity : AppActivity() {
     private var fragment: MediaViewerFragment? = null
     private val viewerBackground = ColorDrawable(Color.BLACK)
     private var viewerBackgroundAnimator: ValueAnimator? = null
+    private var hasFinishedEnterTransition = false
 
     val canRevealFileList: Boolean
         get() = intent.getBooleanExtra(EXTRA_CAN_REVEAL_FILE_LIST, false)
@@ -65,13 +66,30 @@ class MediaViewerActivity : AppActivity() {
         // Plan 18 section 3.3 names the wrong hook; this is the one that means "finished".
         //
         // PhoneWindow inflates this transition per window, so the listener cannot outlive us.
-        window.sharedElementEnterTransition?.addListener(object : TransitionListenerAdapter() {
-            override fun onTransitionEnd(transition: Transition) {
-                transition.removeListener(this)
-                logMediaTransition("viewer: enter transition end")
-                fragment?.onEnterTransitionEnd()
-            }
-        })
+        val enterTransition = window.sharedElementEnterTransition
+        if (enterTransition != null) {
+            enterTransition.addListener(object : TransitionListenerAdapter() {
+                override fun onTransitionEnd(transition: Transition) {
+                    transition.removeListener(this)
+                    finishEnterTransition("end")
+                }
+
+                override fun onTransitionCancel(transition: Transition) {
+                    transition.removeListener(this)
+                    finishEnterTransition("cancel")
+                }
+            })
+        } else {
+            window.decorView.post { finishEnterTransition("none") }
+        }
+    }
+
+    private fun finishEnterTransition(reason: String) {
+        if (hasFinishedEnterTransition) return
+        hasFinishedEnterTransition = true
+        logMediaTransition("viewer: enter transition $reason")
+        viewportSessionId?.let(MediaViewerViewportCoordinator::notifyViewerEnterFinished)
+        fragment?.onEnterTransitionEnd()
     }
 
     /**

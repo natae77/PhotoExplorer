@@ -10,7 +10,10 @@ import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.graphics.Rect
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -43,6 +46,7 @@ import androidx.core.app.SharedElementCallback
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
+import androidx.core.graphics.drawable.toBitmap
 import androidx.core.view.GravityCompat
 import androidx.core.view.doOnPreDraw
 import androidx.core.view.isVisible
@@ -183,7 +187,7 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
     // See plan 18 section 3.3 (2).
     private val openMediaViewerLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
-    ) { finishMediaViewportSession() }
+    ) { onMediaViewerResultReceived() }
 
     private val args by args<Args>()
     private val argsPath by lazy { args.intent.extraPath }
@@ -212,9 +216,25 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
     private var activeMediaViewportSessionId: String? = null
     private var mediaViewportHiddenPath: Path? = null
     private var mediaOpeningSharedElementPath: Path? = null
+    private var mediaViewerResultReceived = false
+    private var mediaReturnTransitionTerminal = false
+    private var mediaReturnCarrierLease: FileListAdapter.ViewHolder? = null
 
-    private val mediaViewportListener = MediaViewerViewportCoordinator.FileListListener {
-        prepareMediaViewport(it)
+    private val mediaViewportListener = object : MediaViewerViewportCoordinator.FileListListener {
+        override fun onViewportRequested(request: MediaViewerViewportCoordinator.Request) {
+            prepareMediaViewport(request)
+        }
+
+        override fun onViewerEnterFinished() {
+            resetOpeningSharedElementCarrier()
+        }
+    }
+
+    private val mediaReturnCleanupTimeout = Runnable {
+        if (mediaViewerResultReceived) {
+            logMediaTransition("grid return: terminal timeout -> cleanup")
+            finishMediaViewportSession()
+        }
     }
 
     // The folder the list currently on screen was loaded for. fileListLiveData is a switch map on
@@ -479,8 +499,10 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
     }
 
     override fun onDestroyView() {
+        binding.recyclerView.removeCallbacks(mediaReturnCleanupTimeout)
         setMediaViewportHiddenPath(null)
-        restoreOpeningMediaTile()
+        releaseMediaReturnCarrierLease()
+        resetOpeningSharedElementCarrier()
         activeMediaViewportSessionId?.let {
             MediaViewerViewportCoordinator.unregisterFileList(it, mediaViewportListener)
         }
@@ -1516,6 +1538,7 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
         // onMapSharedElements() synchronously.
         mediaReturnMappingState = MediaReturnMappingState.OPENING
         mediaReturnPath = null
+        finishMediaViewportSession()
         val options = mediaTransitionOptions(file.path)
         logMediaTransition(
             "grid open: ${file.path} viewType=${viewModel.viewType}" +
@@ -1527,11 +1550,10 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
             startActivitySafe(intent)
             return
         }
-        finishMediaViewportSession()
-        // ActivityOptions has already captured the opening tile. From this point the framework
-        // hides it as the source shared element until we deliberately move the empty slot.
-        mediaViewportHiddenPath = file.path
+        // The real thumbnail, not the carrier, owns the empty slot underneath the viewer.
         mediaOpeningSharedElementPath = file.path
+        mediaViewerResultReceived = false
+        mediaReturnTransitionTerminal = false
         val viewportSessionId = MediaViewerViewportCoordinator.createSession()
         activeMediaViewportSessionId = viewportSessionId
         MediaViewerViewportCoordinator.registerFileList(viewportSessionId, mediaViewportListener)
@@ -1541,11 +1563,37 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
         openMediaViewerLauncher.launchSafe(intent, options, this)
     }
 
+    private fun onMediaViewerResultReceived() {
+        mediaViewerResultReceived = true
+        if (mediaReturnTransitionTerminal || mediaReturnMappingState == MediaReturnMappingState.BLOCKED) {
+            finishMediaViewportSession()
+            return
+        }
+        binding.recyclerView.removeCallbacks(mediaReturnCleanupTimeout)
+        binding.recyclerView.postDelayed(
+            mediaReturnCleanupTimeout, RETURN_TRANSITION_CLEANUP_TIMEOUT_MILLIS
+        )
+    }
+
+    fun onMediaReturnTransitionTerminal() {
+        if (mediaReturnTransitionTerminal) return
+        mediaReturnTransitionTerminal = true
+        logMediaTransition("grid return: transition terminal")
+        if (mediaViewerResultReceived) {
+            finishMediaViewportSession()
+        }
+    }
+
     private fun finishMediaViewportSession() {
+        if (::binding.isInitialized) {
+            binding.recyclerView.removeCallbacks(mediaReturnCleanupTimeout)
+        }
         setMediaViewportHiddenPath(null)
-        // The return may be remapped to a different tile. Android then restores that target, but
-        // leaves the original opening shared element hidden after the return transition finishes.
-        restoreOpeningMediaTile()
+        releaseMediaReturnCarrierLease()
+        resetOpeningSharedElementCarrier()
+        mediaOpeningSharedElementPath = null
+        mediaViewerResultReceived = false
+        mediaReturnTransitionTerminal = false
         val sessionId = activeMediaViewportSessionId ?: return
         MediaViewerViewportCoordinator.unregisterFileList(sessionId, mediaViewportListener)
         MediaViewerViewportCoordinator.endSession(sessionId)
@@ -1557,23 +1605,32 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
         if (viewModel.viewType != FileViewType.MEDIA) {
             return null
         }
-        val tile = mediaTileImageFor(path) ?: return null
+        val tile = mediaTileFor(path) ?: return null
+        val carrier = tile.sharedElementImage ?: return null
+        val drawable = createSharedElementDrawable(tile.thumbnailImage) ?: return null
+        resetSharedElementCarrier(carrier)
+        carrier.setImageDrawable(drawable)
+        carrier.transitionName = mediaTransitionName(path)
+        mediaViewportHiddenPath = path
+        tile.thumbnailImage.alpha = 0f
         return ActivityOptionsCompat.makeSceneTransitionAnimation(
-            requireActivity(), tile, mediaTransitionName(path)
+            requireActivity(), carrier, mediaTransitionName(path)
         )
     }
 
     /**
-     * The thumbnail of [path]'s tile, or null when it has no view on screen right now.
+     * The media tile for [path], or null when it has no holder on screen right now.
      *
      * ⚠️ Media mode mixes date tiles in among the files, so the adapter's own map is the only
      * honest way from a path to an adapter position. See plan 18 section 3.3.
      */
-    private fun mediaTileImageFor(path: Path, requireVisible: Boolean = true): ImageView? {
+    private fun mediaTileFor(path: Path, requireVisible: Boolean = true): MediaTile? {
         val position = adapter.findFilePosition(path) ?: return null
         val holder = binding.recyclerView.findViewHolderForAdapterPosition(position)
             as? FileListAdapter.ViewHolder ?: return null
-        return holder.thumbnailImage.takeIf { !requireVisible || it.isVisible }
+        val thumbnailImage = holder.thumbnailImage
+        if (requireVisible && !thumbnailImage.isVisible) return null
+        return MediaTile(holder, thumbnailImage, holder.sharedElementImage)
     }
 
     override fun shouldHideMediaThumbnail(path: Path): Boolean =
@@ -1582,47 +1639,76 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
     private fun restoreMediaTile(imageView: ImageView) {
         imageView.isVisible = true
         imageView.alpha = 1f
-        // The framework hides the opening shared element with transitionAlpha, which is separate
-        // from the ordinary alpha above. When the return is remapped to another tile, only the new
-        // target is restored automatically, so the opening tile otherwise stays blank.
-        imageView.setTransitionAlphaCompat(1f)
-        imageView.setTransitionVisibilityCompat(View.VISIBLE)
     }
 
-    private fun restoreOpeningMediaTile() {
+    private fun resetOpeningSharedElementCarrier() {
         val path = mediaOpeningSharedElementPath ?: return
-        mediaOpeningSharedElementPath = null
-        mediaTileImageFor(path, false)?.apply {
-            transitionName = mediaTransitionName(path)
-            restoreMediaTile(this)
+        mediaTileFor(path, false)?.sharedElementImage?.let(::resetSharedElementCarrier)
+    }
+
+    private fun resetSharedElementCarrier(carrier: ImageView) {
+        carrier.apply {
+            setImageDrawable(null)
+            transitionName = null
+            isVisible = true
+            alpha = 1f
+            setTransitionAlphaCompat(1f)
+            setTransitionVisibilityCompat(View.VISIBLE)
         }
     }
 
-    private fun detachOpeningMediaTileFromReturnTransition(returnPath: Path) {
-        val openingPath = mediaOpeningSharedElementPath ?: return
-        if (openingPath == returnPath) return
-        mediaTileImageFor(openingPath, false)?.apply {
-            // The framework starts the return with the opening shared element's original name.
-            // Once another tile is the return target, leaving that name on the opening tile makes
-            // Android hide it once more before the remapped transition and restore it afterward,
-            // which appears as a single flash in the grid.
-            transitionName = null
-            restoreMediaTile(this)
+    private fun createSharedElementDrawable(thumbnailImage: ImageView): Drawable? {
+        val source = thumbnailImage.drawable ?: return null
+        return try {
+            source.constantState?.newDrawable(resources)?.mutate()?.also {
+                it.level = source.level
+                if (it.isStateful) {
+                    it.state = source.state
+                }
+            } ?: BitmapDrawable(
+                resources,
+                source.toBitmap(
+                    thumbnailImage.width.coerceAtLeast(1),
+                    thumbnailImage.height.coerceAtLeast(1),
+                    Bitmap.Config.ARGB_8888
+                )
+            )
+        } catch (exception: RuntimeException) {
+            logMediaTransition("grid carrier drawable failed: $exception")
+            null
         }
+    }
+
+    private fun acquireMediaReturnCarrierLease(tile: MediaTile) {
+        if (mediaReturnCarrierLease === tile.holder) return
+        releaseMediaReturnCarrierLease()
+        tile.holder.setIsRecyclable(false)
+        tile.sharedElementImage?.setHasTransientState(true)
+        mediaReturnCarrierLease = tile.holder
+    }
+
+    private fun releaseMediaReturnCarrierLease() {
+        val holder = mediaReturnCarrierLease ?: return
+        mediaReturnCarrierLease = null
+        holder.sharedElementImage?.apply {
+            setHasTransientState(false)
+            resetSharedElementCarrier(this)
+        }
+        holder.setIsRecyclable(true)
     }
 
     private fun setMediaViewportHiddenPath(path: Path?) {
         if (mediaViewportHiddenPath == path) {
-            path?.let { mediaTileImageFor(it, false)?.alpha = 0f }
+            path?.let { mediaTileFor(it, false)?.thumbnailImage?.alpha = 0f }
             return
         }
         val previousPath = mediaViewportHiddenPath
         mediaViewportHiddenPath = path
         previousPath?.let {
-            mediaTileImageFor(it, false)?.let(::restoreMediaTile)
+            mediaTileFor(it, false)?.thumbnailImage?.let(::restoreMediaTile)
         }
         path?.let {
-            mediaTileImageFor(it, false)?.apply {
+            mediaTileFor(it, false)?.thumbnailImage?.apply {
                 isVisible = true
                 alpha = 0f
             }
@@ -1808,26 +1894,29 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
                 sharedElements.clear()
                 return
             }
-            detachOpeningMediaTileFromReturnTransition(path)
-            val tile = mediaTileImageFor(path, false)
-            if (tile == null) {
+            val originalName = names.firstOrNull()
+            val tile = mediaTileFor(path, false)
+            val carrier = tile?.sharedElementImage
+            val drawable = tile?.let { createSharedElementDrawable(it.thumbnailImage) }
+            if (originalName == null || tile == null || carrier == null || drawable == null) {
                 // The file is gone, or too far outside the list the viewer was given. Empty both,
                 // or the framework flies the tile we opened from. See plan 18 3.7 (F3).
                 logMediaTransition("grid map: no tile for $path -> blocked")
+                mediaReturnMappingState = MediaReturnMappingState.BLOCKED
+                releaseMediaReturnCarrierLease()
                 names.clear()
                 sharedElements.clear()
                 return
             }
-            val originalName = names.firstOrNull()
-            if (originalName == null) {
-                sharedElements.clear()
-                return
-            }
+            resetSharedElementCarrier(carrier)
+            carrier.setImageDrawable(drawable)
+            carrier.transitionName = originalName
+            acquireMediaReturnCarrierLease(tile)
             logMediaTransition(
-                "grid map: returning to $path, names=$names -> view remapped"
+                "grid map: returning to $path, names=$names -> carrier remapped"
             )
             sharedElements.clear()
-            sharedElements[originalName] = tile
+            sharedElements[originalName] = carrier
         }
     }
 
@@ -2247,6 +2336,12 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
         BLOCKED
     }
 
+    private data class MediaTile(
+        val holder: FileListAdapter.ViewHolder,
+        val thumbnailImage: ImageView,
+        val sharedElementImage: ImageView?
+    )
+
     companion object {
         private const val ACTION_VIEW_DOWNLOADS =
             "me.zhanghai.android.files.intent.action.VIEW_DOWNLOADS"
@@ -2262,6 +2357,7 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
         private const val POSTPONE_RETURN_TIMEOUT_MILLIS = 500L
         private const val VIEWPORT_PREPARE_TIMEOUT_MILLIS = 500L
         private const val VIEWPORT_PREPARE_LAYOUT_ATTEMPTS = 3
+        private const val RETURN_TRANSITION_CLEANUP_TIMEOUT_MILLIS = 1000L
         private const val STATE_ACTIVE_MEDIA_VIEWPORT_SESSION_ID =
             "activeMediaViewportSessionId"
         private const val STATE_MEDIA_OPENING_SHARED_ELEMENT_PATH =
