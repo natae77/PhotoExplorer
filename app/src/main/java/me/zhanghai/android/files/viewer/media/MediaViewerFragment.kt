@@ -101,7 +101,7 @@ class MediaViewerFragment :
 
     private var playerHolder: VideoPlayerHolder? = null
     private var renderedVideoPath: Path? = null
-    private var isPreparingReturn = false
+    private var returnState = ReturnState.IDLE
 
     private var isSystemUiVisible = true
 
@@ -119,8 +119,8 @@ class MediaViewerFragment :
      * transition image is legitimately empty when onMapSharedElements() runs, because nothing has
      * filled it in yet.
      */
-    var isReturning = false
-        private set
+    val isReturning: Boolean
+        get() = returnState == ReturnState.RETURNING
 
     /**
      * Whether we were opened with a shared element at all, see plan 18 section 3.7 (F1, F2).
@@ -145,6 +145,38 @@ class MediaViewerFragment :
     val transitionImageOrNull: ImageView?
         get() =
             if (view != null && this::binding.isInitialized) binding.transitionImage else null
+
+    private val swipeDownListener = object : SwipeDownDismissLayout.Listener {
+        override fun onDragStarted(layout: SwipeDownDismissLayout) {
+            if (!canRevealFileListBehind(layout)) return
+            (activity as? MediaViewerActivity)
+                ?.setViewerBackgroundAlpha(BACKGROUND_ALPHA_AT_DRAG_START)
+        }
+
+        override fun onDragProgress(layout: SwipeDownDismissLayout, progress: Float) {
+            if (!canRevealFileListBehind(layout)) return
+            val revealProgress = (progress / BACKGROUND_FULL_REVEAL_FRACTION).coerceIn(0f, 1f)
+            val alpha = BACKGROUND_ALPHA_AT_DRAG_START * (1f - revealProgress)
+            (activity as? MediaViewerActivity)?.setViewerBackgroundAlpha(alpha)
+        }
+
+        override fun onDragCancelled(layout: SwipeDownDismissLayout) {
+            if (layout !== currentPageRoot()) return
+            (activity as? MediaViewerActivity)?.restoreViewerBackground()
+        }
+
+        override fun onDismissed(layout: SwipeDownDismissLayout) {
+            if (layout !== currentPageRoot()) return
+            (activity as? MediaViewerActivity)?.cancelViewerBackgroundAnimation()
+            finishWithReturnTransition()
+        }
+    }
+
+    private fun canRevealFileListBehind(layout: SwipeDownDismissLayout): Boolean =
+        layout === currentPageRoot()
+            && returnState == ReturnState.IDLE
+            && !isEntering
+            && (activity as? MediaViewerActivity)?.canRevealFileList == true
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -223,8 +255,7 @@ class MediaViewerFragment :
         adapter = MediaViewerAdapter(
             viewLifecycleOwner,
             { systemUiHelper.toggle() },
-            // Swiping down should be the same as pressing back.
-            { activity.onBackPressedDispatcher.onBackPressed() }
+            swipeDownListener
         ).apply { replace(paths) }
         binding.viewPager.apply {
             // 1 is the default for the old androidx.viewpager.widget.ViewPager.
@@ -235,6 +266,7 @@ class MediaViewerFragment :
             setPageTransformer(DepthPageTransformer)
             registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
                 override fun onPageSelected(position: Int) {
+                    (activity as? MediaViewerActivity)?.setViewerBackgroundAlpha(1f)
                     // Do not start here. Fast flinging fires this for every page passed, and each
                     // one would briefly play sound. See spec 11 section 5.1.
                     stopPlaybackIfPageChanged()
@@ -275,11 +307,12 @@ class MediaViewerFragment :
     }
 
     private fun finishWithReturnTransition() {
-        if (isPreparingReturn || isReturning) return
+        if (returnState != ReturnState.IDLE) return
         val exitActivity = requireActivity()
         val exitView = view
         val exitPath = currentPath
         val surface = currentVideoBinding?.playerView?.videoSurfaceView as? SurfaceView
+        lockReturnInput()
         if (!hasSharedElement || surface == null || renderedVideoPath != exitPath
             || Build.VERSION.SDK_INT < Build.VERSION_CODES.N
             || !surface.holder.surface.isValid || surface.width <= 0 || surface.height <= 0) {
@@ -288,14 +321,13 @@ class MediaViewerFragment :
             return
         }
         // HDR playback uses SurfaceView. Copy its last frame before hiding/releasing the surface.
-        isPreparingReturn = true
+        returnState = ReturnState.PREPARING_RETURN
         playerHolder?.exoPlayer?.pause()
         val handler = Handler(Looper.getMainLooper())
         var completed = false
         fun complete(drawable: Drawable?) {
             if (completed) return
             completed = true
-            isPreparingReturn = false
             if (view !== exitView || exitActivity.isFinishing || exitActivity.isDestroyed) return
             prepareReturnTransition(drawable?.takeIf { currentPath == exitPath })
             exitActivity.finishAfterTransition()
@@ -329,7 +361,7 @@ class MediaViewerFragment :
      * element.
      */
     private fun prepareReturnTransition(videoFrame: Drawable? = null) {
-        isReturning = true
+        returnState = ReturnState.RETURNING
         val activity = requireActivity()
         if (!hasSharedElement) {
             // Nothing to return to. Leaving the pager alone keeps the ordinary window animation
@@ -368,6 +400,12 @@ class MediaViewerFragment :
         binding.viewPager.isVisible = false
         binding.appBarLayout.isVisible = false
         binding.playerControlView.visibility = View.GONE
+    }
+
+    private fun lockReturnInput() {
+        binding.viewPager.isUserInputEnabled = false
+        currentPageRoot()?.isEnabled = false
+        binding.playerControlView.isEnabled = false
     }
 
     /** The picture to fly back with, or null when this page cannot take part (F4, F5). */
@@ -613,6 +651,14 @@ class MediaViewerFragment :
     }
 
     override fun onDestroyView() {
+        if (returnState != ReturnState.RETURNING) {
+            (activity as? MediaViewerActivity)?.setViewerBackgroundAlpha(1f)
+        }
+        // PixelCopy can still be in flight when rotation recreates the view. Its completion is
+        // tied to the old view and intentionally ignored; let the new view accept another return.
+        if (returnState == ReturnState.PREPARING_RETURN) {
+            returnState = ReturnState.IDLE
+        }
         super.onDestroyView()
 
         playerHolder?.release()
@@ -974,6 +1020,9 @@ class MediaViewerFragment :
         get() = paths[binding.viewPager.currentItem]
 
     companion object {
+        private const val BACKGROUND_FULL_REVEAL_FRACTION = 0.25f
+        private const val BACKGROUND_ALPHA_AT_DRAG_START = 0.85f
+
         // Spec 11 section 6.3. 0.25 is there to slow fast motion down, e.g. a golf swing.
         private val PLAYBACK_SPEEDS = floatArrayOf(0.25f, 0.5f, 0.75f, 1f, 1.5f, 2f)
 
@@ -1002,4 +1051,10 @@ class MediaViewerFragment :
 
     @Parcelize
     private class State(val paths: @WriteWith<ParcelableListParceler> List<Path>) : ParcelableState
+
+    private enum class ReturnState {
+        IDLE,
+        PREPARING_RETURN,
+        RETURNING
+    }
 }

@@ -3,15 +3,17 @@
 미디어 모드에서 사진을 열면 **타일이 커지면서 뷰어가 되고**, 뷰어를 닫으면
 **미디어가 원래 타일 자리로 줄어들며 들어간다.** 지금의 좌우 슬라이드를 대체한다.
 
-- 작성일: 2026-09-04 / 최종 개정: **2026-09-11 (6차)**
+- 작성일: 2026-09-04 / 최종 개정: **2026-09-11 (8차)**
 - 프로젝트: **PhotoExplorer** (`natae77/PhotoExplorer`, `zhanghai/MaterialFiles` fork)
 - 기준 소스: `feature/media-view-mode` (`8c3e67d2` 시점)
-- 상태: **구현 완료 — 파일 목록 UI 통합 빌드를 에뮬레이터에서 검증, 실기기 통합 재검증 남음** (§5.4·§5.5)
+- 상태: **7차 아래 스와이프 접합 구현 완료 · 에뮬레이터 핵심 경로 검증, 확장 매트릭스 미검증** (§3.6.1·§5.6·§5.7)
 
 **개정 이력** — 이 문서는 개정할 때 새 문서를 만들지 않고 **본문을 직접 고친다.**
 
 | 개정 | 날짜 | 무엇이 바뀌었나 |
 |---|---|---|
+| 8차 | 2026-09-11 | 7차 접합 계획을 구현했다. 반투명 Immersive 창의 검정 배경 알파, 내부 폴더 진입 표식, 드래그 콜백, 종료 상태기·입력 잠금을 연결하고 `PixelCopy` 준비 중 뷰 재생성도 안전하게 초기화했다. 빌드·단위 테스트와 에뮬레이터 핵심 경로 결과를 §5.7에 기록했다 |
+| 7차 | 2026-09-11 | 10번 5차 요구를 접합했다. 작은 이동량 임계값으로 아래 스와이프를 확정하면 뷰어 창의 검정 `windowBackground` 알파를 낮춰 **실제 폴더 화면을 사진 아래에 선노출**하고, 사진은 누적된 이동량을 따라잡은 뒤 손가락과 1:1로 움직인다. 드래그 중 배경 노출과 손을 놓은 뒤의 공유 요소 복귀를 분리했다(§3.6.1, D27) |
 | 6차 | 2026-09-11 | 문서 번호를 14 → **18**로 바로잡았다. 파일 목록 UI와 통합하면서 동영상 출력이 `TextureView`에서 HDR용 `SurfaceView`로 바뀐 것을 반영해, 현재 프레임 획득을 **`PixelCopy` 비동기 복사**로 수정했다(§3.5·§3.6, D26). 별도 통합 검증 문서의 결과와 미검증 범위를 §5.5에 합쳤다 |
 | 5차 | 2026-09-04 | **구현하면서 실기(에뮬레이터)에서 드러난 것들.** ⚠️ **§3.3이 지목한 전환 종료 훅이 틀렸다 — `onSharedElementEnd` 는 전환이 끝날 때가 아니라 시작하기 전에 불린다**(§3.3, D22). 진입에도 §3.6 (1)과 같은 **같은 그림 둘** 문제가 있다는 것을 빠뜨렸다(§3.3, D23). **Coil 이 하드웨어 비트맵을 주면 프레임워크 스냅샷이 앱을 죽인다**(§3.5, D24). 폴백에서 페이지를 감추면 안 된다는 것(§3.7 F1·F2, D25) |
 | 4차 | 2026-09-04 | 3차 소스 대조 리뷰 반영. **폴백 가드가 진입에서 먼저 걸려 열기 전환을 죽이던 것**을 방향 구분으로 고쳤다(§3.2, D20). **enter 콜백 등록 자리가 한 박자 늦어** 진입에만 안 걸리던 것을 액티비티 `onCreate` 로 옮겼다(§3.2, D19 정정). 자리를 못 박지 않았던 셋 — 전환 종료 훅, 로딩 완료 신호, exit 콜백 등록 자리 — 을 정했다(§3.3·§3.5·§3.4) |
@@ -500,7 +502,10 @@ activity.onBackPressedDispatcher.addCallback(viewLifecycleOwner) {
 - 콜백 안에서 `finishAfterTransition()` 을 **직접 부른다.** 콜백이 뒤로가기를 소비하므로
   기본 처리(= `Activity.onBackPressed()` 의 `finishAfterTransition()`)가 돌지 않는다.
 - `SurfaceView` 동영상은 `finishAfterTransition()`을 `PixelCopy` 성공·실패 또는 500ms 시간 제한
-  뒤에 부른다. 기다리는 동안 `isPreparingReturn`으로 중복 종료를 막는다.
+  뒤에 부른다. 종료 상태는 `IDLE → PREPARING_RETURN → RETURNING`으로 관리한다.
+  `PREPARING_RETURN`부터 ViewPager·아래 스와이프 입력을 잠그고, 성공·실패·시간 제한을 하나의
+  `completeOnce` 경로로 모은다. 뷰가 파괴되면 timeout/callback을 무효화하고 살아 있는 액티비티는
+  그림 없는 일반 종료로 끝낸다.
 - ⚠️ **항상 켜진 콜백은 Android 13+ 예측형 뒤로가기 애니메이션을 끈다.** 지금도 쓰고 있지
   않으므로 회귀는 아니다(§1 비목표).
 
@@ -525,6 +530,38 @@ transitionImage.scaleY = page.scaleY
 읽는다. 알파는 옮기지 않는다 — 공유 요소는 전환 동안 불투명해야 자연스럽다.
 
 D12는 유지된다. 페이지를 되돌리지 않으므로 한 프레임 튀지 않는다.
+
+### 3.6.1 아래로 끄는 동안의 폴더 선노출 (7차)
+
+10번 5차에서 아래 스와이프는 두 단계가 된다.
+
+| 시점 | 보이는 것 | 전환 상태 |
+|---|---|---|
+| 임계값 전 | 사진과 검정 배경 유지 | 경과 시간과 무관하게 공유 요소 복귀는 시작하지 않음 |
+| 드래그 확정 직후 | 검정 window background가 85% 알파가 되어 실제 폴더 화면이 비치기 시작 | 공유 요소 복귀는 아직 시작하지 않음 |
+| 드래그 중 | 확정 순간 누적 이동량을 따라잡고, 폴더 화면 위에서 사진이 손가락과 1:1로 움직임 | `FileListActivity`는 아래에서 그대로 유지 |
+| 취소 | 사진과 검정 배경이 같은 200ms 동안 원상 복귀 | 복귀 전환 없음 |
+| 닫힘 확정 | 끌던 사진 위치·크기를 `transitionImage`가 이어받음 | 이때 처음 `finishAfterTransition()` 시작 |
+
+**드래그 중 폴더 선노출은 공유 요소 전환이 아니다.** 기존 Immersive 뷰어 테마를 반투명 창으로
+만들되 검정 `ColorDrawable` window background는 유지하고, 그 알파를 낮춰 바로 아래
+`FileListActivity`를 보여 주는 것이다. 공유 요소
+return coordinator를 MOVE 중에 시작하면 취소할 수 없고, 손가락을 놓기 전에 액티비티 수명이
+끝날 수 있으므로 기존 종료 훅은 UP의 닫힘 확정 시점까지 호출하지 않는다(D27).
+
+뷰어는 평소 window background 알파 255로 지금과 같은 검정 배경을 유지한다.
+`FileListFragment.openMediaViewer()`의 명시적 실행에서만 “아래에 폴더 화면이 있음” extra를 주고
+배경 알파를 낮춘다. 공용 `maybeAddMediaViewerExtras()`에는 넣지 않는다. 이 extra와 `hasSharedElement`는 다르다.
+리스트·바둑판 모드의 동영상은 공유 요소가 없어도 아래에 폴더 화면은 있으므로 드래그 중 선노출할
+수 있다. 반대로 외부 `VIEW` 인텐트는 검정 배경을 유지해 다른 앱이나 런처를 드러내지 않는다.
+
+확정 순간 배경 알파는 85%로 낮추고 실제 이동량 25%에서 0%가 되도록 선형으로 줄인다. 사진 이동과
+배경 변경은 같은 MOVE/vsync에 반영한다. “폴더가 먼저”는 별도 이전 프레임이 아니라 **사진의 첫 이동
+프레임에 이미 폴더가 보인다**는 뜻이다. 시스템 바는 뷰어가 계속 소유하고 드래그 중 바꾸지 않는다.
+
+닫힘이 확정되면 §3.6 (2)처럼 **손가락과 1:1로 이동한 사진의 표시 변형**을 `transitionImage`로
+옮긴다. 10번 §3.3에 따라 확정 MOVE에서 `touchSlop`을 빼지 않고 누적 이동량을 따라잡으므로,
+공유 요소 전환도 사용자가 놓은 실제 위치에서 시작한다.
 
 ### 3.7 폴백 — 짝이 없으면 조용히 지금까지의 전환
 
@@ -659,9 +696,13 @@ ANDROID_HOME="C:\Users\hskang\AppData\Local\Android\Sdk" JAVA_HOME="/c/Program F
   **같은 그림이 둘 보이지 않는다.**
 
 ### 10단계 — 아래로 끌기와 접합
-- 종료 훅에서 페이지의 변형을 `transitionImage` 로 옮긴다 (§3.6 (2)).
+- 기존 Immersive Material 2·3 base에 `windowIsTranslucent=true`를 추가하고 검정
+  `windowBackground`는 유지한다. 내부 폴더 진입 여부에 따라 그 drawable 알파만 제어한다(§3.6.1).
+- 드래그 중에는 공유 요소 전환을 시작하지 않는다. 취소 시 사진·배경을 같은 200ms로 복원한다.
+- 드래그 중 사진 자체의 alpha 감소는 제거한다. 이동·축소·배경 alpha만 사용한다.
+- 종료 훅에서 손가락과 1:1로 이동한 페이지의 표시 변형을 `transitionImage` 로 옮긴다 (§3.6 (2)).
 - **확인**: 40% 끌어 닫기, 12% 빠르게 튕겨 닫기 둘 다 끌던 자리에서 이어진다.
-  10번 §6의 수용 기준 1~4가 유지되는지도 본다.
+  10번 §6의 수용 기준 1~7이 유지되는지도 본다.
 
 ### 11단계 — 폴백 다섯 가지 훑기
 - F1~F5를 하나씩 만들어 본다 (§3.7).
@@ -676,7 +717,8 @@ ANDROID_HOME="C:\Users\hskang\AppData\Local\Android\Sdk" JAVA_HOME="/c/Program F
 
 ## 5. 검증
 
-이 프로젝트에는 **테스트 소스셋이 없다**(10번 §5, 12번 §0과 같다). **컴파일 통과 + 실기기 확인**으로 검증한다.
+현재 `app/src/test`가 있으므로 임계값·방향·거리 판정은 가능한 범위에서 단위 테스트한다.
+공유 요소·창 합성·손맛은 **컴파일 통과 + 에뮬레이터·실기기 확인**으로 검증한다.
 
 ### 5.1 ⚠️ 실패 모양이 서로 구분되지 않는다
 
@@ -724,7 +766,7 @@ ANDROID_HOME="C:\Users\hskang\AppData\Local\Android\Sdk" JAVA_HOME="/c/Program F
 5. **뒤로가기·위 화살표·아래로 끌기 셋 다** 타일로 들어간다.
 6. 좌우로 넘긴 뒤 닫으면 **그 파일의** 타일로 간다.
 7. 그 타일이 화면 밖이면 그리드가 먼저 스크롤한다.
-8. 아래로 끌다 놓으면 **끌던 자리에서 이어진다.** 튀지 않는다.
+8. 작은 이동량 임계값을 넘으면 사진이 누적 이동량을 따라잡아 손가락과 1:1로 움직이고, 사진이 움직이기 전에 실제 폴더 화면이 아래에 보인다. 놓으면 **끌던 자리에서 이어진다.** 튀지 않는다.
 9. 전환 중에 **같은 그림이 둘 보이지 않는다.**
 10. **가로 대용량 사진**이 마지막에 튀지 않는다.
 
@@ -738,7 +780,7 @@ ANDROID_HOME="C:\Users\hskang\AppData\Local\Android\Sdk" JAVA_HOME="/c/Program F
 
 **회귀 (10번·12번 수용 기준 유지)**
 
-15. 아래로 끌기 판정이 예전과 같다(10번 §6의 1~4).
+15. 아래로 끌기의 이동량 임계값·누적 이동 따라잡기·폴더 선노출·취소 복원·거리와 속도 판정이 10번 §6의 1~7과 같다.
 16. 좌우 페이지 넘김, 탭 토글, 더블탭 확대, 확대 후 pan이 그대로다.
 17. 동영상 재생 중에 **셋 중 어느 방법으로 닫아도** 소리가 남지 않고 플레이어가 해제된다.
 18. 뷰어에서 파일을 삭제한 뒤에도 목록이 정상이다.
@@ -844,21 +886,46 @@ API 근거: [Android `PixelCopy`](https://developer.android.com/reference/androi
 화면 밖 타일 복귀, 화면 회전·액티비티 재생성, `PixelCopy` 시간 제한과 구형 API 분기는 확인하지 않았다.
 §5.4의 실기기 결과는 2026-09-04의 통합 전 빌드 결과이므로 이번 통합 빌드의 근거로 간주하지 않는다.
 
+### 5.6 7차에서 새로 확인할 것
+
+- 드래그 첫 이동 프레임보다 폴더 화면 노출이 늦지 않은지 화면 녹화로 프레임 단위 확인한다.
+- 취소하면 뷰어가 불투명 검정으로 완전히 돌아오고 폴더 화면이 남아 비치지 않는지 확인한다.
+- 임계값을 넘는 순간 사진이 누적 이동량을 따라잡는지, 닫힘 확정 순간 `transitionImage`가 그 위치·크기를 이어받아 한 프레임도 튀지 않는지 확인한다.
+- 미디어·리스트·바둑판 모드의 내부 진입과 외부 `VIEW` 진입을 모두 확인한다.
+- 반투명 뷰어 창에서 공유 요소 enter/return, `PixelCopy`, 화면 밖 타일 복귀가 그대로 동작하는지 확인한다.
+- API 23의 PixelCopy 없는 폴백, API 24+, Samsung HDR 실기기에서 `SurfaceView`가 부모의 이동·축소를
+  따라가는지, 검정 사각형·hole punch가 없는지 확인한다.
+- 외부 `VIEW`의 최초 inflate 전·재생성 중에도 다른 앱이나 런처가 노출되지 않는지 확인한다.
+- “액티비티 유지 안 함”, 회전, Fold 7 접기·펼치기에서 아래 `FileListActivity`가 없거나 재생성돼도
+  검정 폴백으로 안전하게 끝나는지 확인한다.
+
+### 5.7 7차 접합 구현 후 핵심 검증 (8차)
+
+2026-09-11 Pixel 8 API 36 에뮬레이터에서 `assembleDebug`와 단위 테스트 7개가 통과했다. 타일의
+공유 요소 진입, 임계값 미만 사진 고정, 임계값 이후 누적 이동량 추종과 실제 `MixTest` 폴더 선노출,
+짧은 드래그 취소 후 완전 복원, 좌우 페이지 이동, 아래 스와이프 후 `FileListActivity` 복귀를
+확인했다. `git diff --check`도 통과했다.
+
+§5.6 중 첫 이동 프레임의 순서, 동영상 `SurfaceView`·`PixelCopy`, 외부 `VIEW`, 화면 밖 타일,
+회전·재생성, 구형 API와 실기기 항목은 아직 검증하지 않았다.
+
 ## 6. 바뀌는 파일
 
 | 파일 | 변경 | 단계 |
 |---|---|---|
 | `viewer/media/MediaTransition.kt` | **신규** — 이름 규칙만 | 2 |
-| `res/values/themes.xml` | `windowActivityTransitions` 명시 (효과는 없을 수 있다) | 1 |
+| `res/values/themes.xml`·`themes_material3.xml` | `windowActivityTransitions` 명시, 7차에서 기존 Immersive base에 `windowIsTranslucent=true` 추가. 검정 background 유지 | 1·10 |
 | `filelist/FileListAdapter.kt` | `transitionName` 설정/해제, `filePositionMap` 읽기용 접근자 | 2 |
-| `filelist/FileListFragment.kt` | 미디어 모드 사진 라우팅, `mediaTileImageFor`, 옵션 붙여 시작, exit 콜백 등록, 복귀 매핑·가드·스크롤 | 3·5·7·8 |
-| `viewer/media/MediaViewerActivity.kt` | `fragment` 필드, `onSupportNavigateUp()`, **enter 콜백 등록** | 4·5 |
-| `viewer/media/MediaViewerFragment.kt` | 종료 훅, `isReturning`, `hasSharedElement`, `currentPageContent()`, `transitionImage` 노출, `setResult`, 진입·복귀 양쪽 감추기, 변형 이어받기, `SurfaceView` 프레임 `PixelCopy`와 시간 제한 | 4·5·6·9·10 |
+| `filelist/FileListFragment.kt` | 미디어 모드 사진 라우팅, `mediaTileImageFor`, 옵션 붙여 시작, exit 콜백 등록, 복귀 매핑·가드·스크롤, 내부 폴더 화면 표식 extra 전달 | 3·5·7·8·10 |
+| `viewer/media/MediaViewerActivity.kt` | `fragment` 필드, `onSupportNavigateUp()`, **enter 콜백 등록**, 내부 진입 extra와 검정 window background 알파 API | 4·5·10 |
+| `viewer/media/MediaViewerFragment.kt` | 종료 훅·상태기·입력 잠금, `isReturning`, `hasSharedElement`, `currentPageContent()`, `transitionImage` 노출, `setResult`, 드래그 변형 이어받기, 검정 window background 제어, `SurfaceView` 프레임 `PixelCopy`와 completeOnce | 4·5·6·9·10 |
 | `viewer/media/MediaViewerAdapter.kt` | **`allowHardware(false)` 두 줄만** (§3.5.1, D24) | 5 |
-| `res/layout/media_viewer_fragment.xml` | `transitionImage` 추가 | 5 |
+| `viewer/media/SwipeDownDismissLayout.kt` | 이동량 임계값을 넘은 순간 누적 이동량 따라잡기, UP 실제 이동량 판정, 멀티터치 거부, 배경용 진행·취소 콜백 | 10 |
+| `res/layout/media_viewer_fragment.xml` | `transitionImage` 추가. 별도 스크림 View는 추가하지 않음 | 5 |
 | `filelist/FileListActivity.kt` | `onActivityReenter` 전달 (+ `isInitialized` 가드) | 7 |
 
-`SwipeDownDismissLayout.kt` 는 **건드리지 않는다** (§3.6 — 확대 판정은 뷰에서 직접 읽는다).
+5차까지는 `SwipeDownDismissLayout.kt`를 건드리지 않았지만, 7차에서는 시작 임계값 뒤 누적 이동량을
+따라잡고 창 배경 알파용 진행 상태를 전달해야 하므로 변경했다. 확대 판정은 기존처럼 뷰에서 직접 읽는다.
 
 ⚠️ **`MediaViewerAdapter.kt` 도 건드리지 않을 작정이었다** — 로딩 상태는 §3.5대로 뷰에서 직접
 읽으므로 콜백을 뚫을 일은 없었다. 다만 **하드웨어 비트맵만은 디코드 시점에 막는 수밖에 없어서**
@@ -879,6 +946,9 @@ API 근거: [Android `PixelCopy`](https://developer.android.com/reference/androi
 | 접힌/펼친 화면 전환 중 복귀 (Fold 7) | 소 | 11단계에서 같이 본다. 폴백으로 떨어져도 무방 |
 | 기본 `move` 전환의 속도가 미디어 모드 느낌과 안 맞는다 | 소 | 12단계 |
 | `PixelCopy`가 늦거나 실패해 종료가 멈춘다 | 중 | 500ms 시간 제한 뒤 그림 없는 일반 종료. API·Surface·크기·생명주기·현재 경로 가드 (§3.5.2) |
+| 반투명 창이 공유 요소 전환·외부 VIEW 생명주기·메모리 사용을 바꾼다 | 중 | Immersive는 현재 뷰어만 사용한다. 검정 배경을 유지하고 §5.6의 enter/return·외부 VIEW·회전·"액티비티 유지 안 함" 매트릭스 확인. 문제가 크면 내부/외부 activity 분리 |
+| 외부 앱이나 런처가 사진 아래로 드러난다 | 중 | 검정 window background를 초기부터 유지하고, `openMediaViewer()`의 내부 extra가 있을 때만 알파를 낮춘다 |
+| 사진 취소와 배경 복귀가 어긋난다 | 중 | 같은 200ms·interpolator, 현재 page 소유권 확인, 새 drag/page 변경/view 파괴 때 animator 취소·alpha 255 복원 |
 
 ## 부록. 확정된 결정 기록
 
@@ -893,7 +963,7 @@ API 근거: [Android `PixelCopy`](https://developer.android.com/reference/androi
 | D7 | 복귀 위치를 위치(index)로 줄 것인가 경로로 줄 것인가 | **경로.** 뷰어에서 파일을 삭제하면 위치가 밀린다 |
 | D8 | 짝이 없을 때 어떻게 할 것인가 | **조용히 예전 전환.** 알리지 않는다 (§3.7) |
 | D9 | 확대된 사진에서도 전환할 것인가 | **하지 않는다.** 폴백 |
-| D10 | `SwipeDownDismissLayout` 을 고칠 것인가 | **고치지 않는다.** 끌던 변형을 뷰어가 `transitionImage` 로 옮겨 받는다 (§3.6) |
+| D10 | `SwipeDownDismissLayout` 을 고칠 것인가 (1차 → **7차에서 뒤집음**) | 6차까지는 건드리지 않았지만 **7차에서 고쳤다.** 이동량 임계값 뒤 누적 이동량을 따라잡고 창 배경 알파용 진행 상태를 전달한다. 끌던 변형을 `transitionImage`가 이어받는 원칙은 유지한다 (§3.6·§3.6.1) |
 | D11 | 10번 D4(`onBackPressedDispatcher`)를 유지할 것인가 | **유지.** 다만 **세 경로가 자동으로 모인다고 본 것은 틀렸다** — D17을 볼 것 |
 | D12 | 동영상은 썸네일로 닫을 것인가 현재 프레임으로 닫을 것인가 | **현재 프레임.** 처음에는 `TextureView.bitmap`, HDR용 `SurfaceView` 전환 뒤에는 `PixelCopy`로 얻는다 (§3.5.2) |
 | D13 | 기획서와 계획서를 나눌 것인가 | **나누지 않는다.** 새 파일 1개 + 고친 파일 8개 규모다 |
@@ -910,3 +980,5 @@ API 근거: [Android `PixelCopy`](https://developer.android.com/reference/androi
 | D25 | 폴백에서도 페이지를 감출 것인가 (5차) | **감추지 않는다.** 평범한 창 애니메이션 내내 빈 화면이 날아간다 (§3.7) |
 | D21 | 로딩 완료를 어떻게 알 것인가 (4차) | **뷰 상태를 직접 읽는 `currentPageContent()` 하나로.** `MediaViewerAdapter` 에 콜백을 뚫지 않는다. 닫을 때의 그림·페이드아웃 시점·폴백 판정 셋이 같은 통로를 쓴다 (§3.5) |
 | D26 | `SurfaceView` 동영상의 현재 프레임을 어떻게 얻을 것인가 (6차) | **`PixelCopy`로 비동기 복사한다.** 500ms 안에 성공하지 않거나 대상이 바뀌면 그림 없는 일반 종료로 폴백한다 (§3.5.2) |
+| D27 | 드래그 중 폴더 화면을 공유 요소 전환으로 보여 줄 것인가 (7차) | **아니다.** 반투명 뷰어 창의 검정 `windowBackground` 알파를 낮춰 아래 `FileListActivity`를 보여 주고, 공유 요소 복귀는 손을 놓아 닫힘이 확정된 뒤에만 시작한다 (§3.6.1) |
+| D28 | 검정 배경을 레이아웃 스크림으로 옮길 것인가 (7차 검토) | **옮기지 않는다.** 외부 VIEW의 inflate 전 노출과 기존 enter coordinator 전제를 지키기 위해 검정 `ColorDrawable` window background를 유지하고 그 알파만 바꾼다 |

@@ -32,7 +32,7 @@ class SwipeDownDismissLayout @JvmOverloads constructor(
      */
     var canDismiss: () -> Boolean = { true }
 
-    var onDismiss: (() -> Unit)? = null
+    var listener: Listener? = null
 
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
     private val minimumFlingVelocity = ViewConfiguration.get(context).scaledMinimumFlingVelocity
@@ -40,12 +40,14 @@ class SwipeDownDismissLayout @JvmOverloads constructor(
     private var downRawX = 0f
     private var downRawY = 0f
     private var isDragging = false
+    private var gestureRejected = false
     private var velocityTracker: VelocityTracker? = null
 
     /** Puts the page back where it belongs, for a view about to be reused. */
     fun reset() {
         animate().cancel()
         isDragging = false
+        gestureRejected = false
         recycleVelocityTracker()
         translationY = 0f
         scaleX = 1f
@@ -67,7 +69,7 @@ class SwipeDownDismissLayout @JvmOverloads constructor(
 
     /** Whether this move turns into a drag of ours. Dominantly downwards, and nothing else wants it. */
     private fun shouldStartDrag(event: MotionEvent): Boolean {
-        if (isDragging || event.pointerCount != 1 || !canDismiss()) {
+        if (isDragging || gestureRejected || event.pointerCount != 1 || !canDismiss()) {
             return false
         }
         val offsetY = event.rawY - downRawY
@@ -80,6 +82,17 @@ class SwipeDownDismissLayout @JvmOverloads constructor(
         isDragging = true
         // Now that it is ours, keep ViewPager2 from taking it back.
         parent?.requestDisallowInterceptTouchEvent(true)
+        listener?.onDragStarted(this)
+    }
+
+    private fun rejectGesture() {
+        gestureRejected = true
+        recycleVelocityTracker()
+        if (isDragging) {
+            isDragging = false
+            listener?.onDragCancelled(this)
+            animateBack()
+        }
     }
 
     override fun onInterceptTouchEvent(event: MotionEvent): Boolean {
@@ -88,6 +101,7 @@ class SwipeDownDismissLayout @JvmOverloads constructor(
                 downRawX = event.rawX
                 downRawY = event.rawY
                 isDragging = false
+                gestureRejected = false
                 recycleVelocityTracker()
                 velocityTracker = VelocityTracker.obtain()
                 trackVelocity(event)
@@ -99,6 +113,7 @@ class SwipeDownDismissLayout @JvmOverloads constructor(
                     return true
                 }
             }
+            MotionEvent.ACTION_POINTER_DOWN -> rejectGesture()
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> recycleVelocityTracker()
         }
         return false
@@ -114,6 +129,18 @@ class SwipeDownDismissLayout @JvmOverloads constructor(
      * moves straight here.
      */
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked == MotionEvent.ACTION_POINTER_DOWN) {
+            rejectGesture()
+            return true
+        }
+        if (gestureRejected) {
+            // Do not turn the end of a rejected multi-touch stream into a click or a new drag.
+            if (event.actionMasked == MotionEvent.ACTION_UP
+                || event.actionMasked == MotionEvent.ACTION_CANCEL) {
+                recycleVelocityTracker()
+            }
+            return true
+        }
         trackVelocity(event)
         if (!isDragging) {
             if (event.actionMasked == MotionEvent.ACTION_MOVE && shouldStartDrag(event)) {
@@ -129,32 +156,35 @@ class SwipeDownDismissLayout @JvmOverloads constructor(
         }
         when (event.actionMasked) {
             MotionEvent.ACTION_MOVE ->
-                // Take the slop off, or the page would jump by that much when the drag starts.
-                setDragOffset((event.rawY - downRawY - touchSlop).coerceAtLeast(0f))
+                // Once the direction is known, catch up the whole distance accumulated while the
+                // gesture was below the threshold, then stay exactly under the finger.
+                setDragOffset((event.rawY - downRawY).coerceAtLeast(0f))
             MotionEvent.ACTION_UP -> {
-                val offset = translationY
+                // Keep the shared-element handoff aligned with the finger's final position even
+                // when UP arrives after the last rendered MOVE.
+                val offset = (event.rawY - downRawY).coerceAtLeast(0f)
+                setDragOffset(offset)
                 val velocity = velocityTracker?.let {
                     it.computeCurrentVelocity(VELOCITY_UNITS)
                     it.yVelocity
                 } ?: 0f
                 isDragging = false
                 recycleVelocityTracker()
-                // The rule ViewPager2 uses for a horizontal swipe: far enough, or fast enough.
-                // The flick also has to have gone somewhere, or a slow short slide would count -
-                // ViewConfiguration's minimum fling velocity is only 50dp/s.
                 val isFarEnough = offset >= height * DISMISS_FRACTION
                 val isFastEnough = velocity >= minimumFlingVelocity
                     && offset >= height * FLICK_MIN_FRACTION
                 if (isFarEnough || isFastEnough) {
                     // Leave the page where it is, the activity exit animation takes it from here.
-                    onDismiss?.invoke()
+                    listener?.onDismissed(this)
                 } else {
+                    listener?.onDragCancelled(this)
                     animateBack()
                 }
             }
             MotionEvent.ACTION_CANCEL -> {
                 isDragging = false
                 recycleVelocityTracker()
+                listener?.onDragCancelled(this)
                 animateBack()
             }
         }
@@ -167,7 +197,10 @@ class SwipeDownDismissLayout @JvmOverloads constructor(
         val scale = 1f - MAX_SCALE_DOWN * progress
         scaleX = scale
         scaleY = scale
-        alpha = 1f - MAX_FADE * progress
+        // Keep the media opaque. The shared element used for the return is opaque too, so fading
+        // here would cause a brightness jump on the frame where the return transition starts.
+        alpha = 1f
+        listener?.onDragProgress(this, progress)
     }
 
     private fun animateBack() {
@@ -201,17 +234,22 @@ class SwipeDownDismissLayout @JvmOverloads constructor(
     }
 
     companion object {
-        // How far down the page has to be before letting go closes the viewer. ViewPager2 uses half
-        // a page for a horizontal swipe, but that is a page coming in rather than one going out.
+        // How far down the page has to be before letting go closes the viewer.
         private const val DISMISS_FRACTION = 0.25f
         // How far a flick has to have gone before its speed counts for anything.
         private const val FLICK_MIN_FRACTION = 0.1f
         // How much more vertical than horizontal a drag has to be before it becomes ours.
         private const val DIRECTION_RATIO = 1.5f
         private const val MAX_SCALE_DOWN = 0.2f
-        private const val MAX_FADE = 0.5f
         private const val ANIMATE_BACK_DURATION = 200L
         // Pixels per second, matching ViewConfiguration's minimum fling velocity.
         private const val VELOCITY_UNITS = 1000
+    }
+
+    interface Listener {
+        fun onDragStarted(layout: SwipeDownDismissLayout) {}
+        fun onDragProgress(layout: SwipeDownDismissLayout, progress: Float) {}
+        fun onDragCancelled(layout: SwipeDownDismissLayout) {}
+        fun onDismissed(layout: SwipeDownDismissLayout)
     }
 }

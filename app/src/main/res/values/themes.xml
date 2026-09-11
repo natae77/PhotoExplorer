@@ -81,6 +81,9 @@
           -->
         <item name="android:windowActivityTransitions">true</item>
         <item name="android:windowBackground">@android:color/black</item>
+        <!-- Keep FileListActivity composited underneath for swipe-down dismissal. The black
+             window background remains opaque until an explicit in-app drag starts. -->
+        <item name="android:windowIsTranslucent">true</item>
 
         <item name="colorPrimary">@color/color_primary_dark</item>
         <item name="colorPrimaryVariant">?colorPrimary</item>

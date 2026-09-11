@@ -1465,6 +1465,10 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
             openFileWithIntent(file, false)
             return
         }
+        // Only this explicit in-app route is guaranteed to have FileListActivity immediately
+        // underneath the viewer. Implicit and external VIEW intents must keep an opaque black
+        // background while dragging down.
+        MediaViewerActivity.markOpenedFromFileList(intent)
         // Whatever the last visit left behind is stale from here on, see plan 18 section 3.4 (3).
         pendingReturnPath = null
         val options = mediaTransitionOptions(file.path)

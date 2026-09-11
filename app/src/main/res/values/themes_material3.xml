@@ -75,6 +75,9 @@
         <item name="android:windowAllowEnterTransitionOverlap">true</item>
         <item name="android:windowAllowReturnTransitionOverlap">true</item>
         <item name="android:windowBackground">@android:color/black</item>
+        <!-- Keep FileListActivity composited underneath for swipe-down dismissal. The black
+             window background remains opaque until an explicit in-app drag starts. -->
+        <item name="android:windowIsTranslucent">true</item>
 
         <item name="colorAccent">?colorPrimary</item>
         <item name="shapeAppearanceSmallComponent">@style/ShapeAppearance.MaterialFiles.Material3.SmallComponent</item>

@@ -44,7 +44,7 @@ import kotlin.math.max
 class MediaViewerAdapter(
     private val lifecycleOwner: LifecycleOwner,
     private val listener: (View) -> Unit,
-    private val onSwipeDown: () -> Unit
+    private val swipeDownListener: SwipeDownDismissLayout.Listener
 ) : SimpleAdapter<Path, RecyclerView.ViewHolder>() {
     override val hasStableIds: Boolean
         get() = true
@@ -62,7 +62,7 @@ class MediaViewerAdapter(
                 // A video page has nothing to zoom, so every downward drag is a dismissal. The
                 // playback controls sit in the fragment layout above the pager and take their own
                 // touches, so dragging the slider never reaches this. See doc 10 section 4.4.
-                binding.root.onDismiss = onSwipeDown
+                binding.root.listener = swipeDownListener
                 VideoViewHolder(binding)
             }
             else -> {
@@ -81,7 +81,7 @@ class MediaViewerAdapter(
                         else -> true
                     }
                 }
-                binding.root.onDismiss = onSwipeDown
+                binding.root.listener = swipeDownListener
                 ImageViewHolder(binding)
             }
         }

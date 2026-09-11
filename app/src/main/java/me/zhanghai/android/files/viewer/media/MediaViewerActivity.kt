@@ -5,7 +5,10 @@
 
 package me.zhanghai.android.files.viewer.media
 
+import android.animation.ValueAnimator
 import android.content.Intent
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.transition.Transition
 import android.transition.TransitionListenerAdapter
@@ -14,6 +17,7 @@ import android.widget.ImageView
 import androidx.core.app.ActivityCompat
 import androidx.core.app.SharedElementCallback
 import androidx.fragment.app.commit
+import androidx.interpolator.view.animation.FastOutSlowInInterpolator
 import java8.nio.file.Path
 import me.zhanghai.android.files.app.AppActivity
 import me.zhanghai.android.files.util.extraPathList
@@ -21,9 +25,18 @@ import me.zhanghai.android.files.util.putArgs
 
 class MediaViewerActivity : AppActivity() {
     private var fragment: MediaViewerFragment? = null
+    private val viewerBackground = ColorDrawable(Color.BLACK)
+    private var viewerBackgroundAnimator: ValueAnimator? = null
+
+    val canRevealFileList: Boolean
+        get() = intent.getBooleanExtra(EXTRA_CAN_REVEAL_FILE_LIST, false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // The window stays black from the first frame, including external VIEW launches. Internal
+        // downward dismissal changes this drawable's alpha to reveal FileListActivity underneath.
+        window.setBackgroundDrawable(viewerBackground)
 
         // Calls ensureSubDecor().
         findViewById<View>(android.R.id.content)
@@ -67,6 +80,33 @@ class MediaViewerActivity : AppActivity() {
     override fun onSupportNavigateUp(): Boolean {
         onBackPressedDispatcher.onBackPressed()
         return true
+    }
+
+    fun setViewerBackgroundAlpha(alpha: Float) {
+        viewerBackgroundAnimator?.cancel()
+        viewerBackgroundAnimator = null
+        viewerBackground.alpha = (alpha.coerceIn(0f, 1f) * 255).toInt()
+    }
+
+    fun restoreViewerBackground() {
+        viewerBackgroundAnimator?.cancel()
+        viewerBackgroundAnimator = ValueAnimator.ofInt(viewerBackground.alpha, 255).apply {
+            duration = BACKGROUND_RESTORE_DURATION_MILLIS
+            interpolator = FastOutSlowInInterpolator()
+            addUpdateListener { viewerBackground.alpha = it.animatedValue as Int }
+            start()
+        }
+    }
+
+    fun cancelViewerBackgroundAnimation() {
+        viewerBackgroundAnimator?.cancel()
+        viewerBackgroundAnimator = null
+    }
+
+    override fun onDestroy() {
+        viewerBackgroundAnimator?.cancel()
+        viewerBackgroundAnimator = null
+        super.onDestroy()
     }
 
     private val sharedElementCallback = object : SharedElementCallback() {
@@ -130,11 +170,18 @@ class MediaViewerActivity : AppActivity() {
 
     companion object {
         private val EXTRA_POSITION = "${MediaViewerActivity::class.java.name}.extra.POSITION"
+        private val EXTRA_CAN_REVEAL_FILE_LIST =
+            "${MediaViewerActivity::class.java.name}.extra.CAN_REVEAL_FILE_LIST"
+        private const val BACKGROUND_RESTORE_DURATION_MILLIS = 200L
 
         fun putExtras(intent: Intent, paths: List<Path>, position: Int) {
             // All extra put here must be framework classes, or we may crash the resolver activity.
             intent.extraPathList = paths
             intent.putExtra(EXTRA_POSITION, position)
+        }
+
+        fun markOpenedFromFileList(intent: Intent) {
+            intent.putExtra(EXTRA_CAN_REVEAL_FILE_LIST, true)
         }
     }
 }
