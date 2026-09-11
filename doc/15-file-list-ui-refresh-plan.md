@@ -95,11 +95,11 @@
 | 이름 제안 | 값 | 쓰임 |
 |---|---:|---|
 | `file_list_path_bar_margin_horizontal` | 16dp | 경로 바 바깥 start/end 여백 |
-| `file_list_path_bar_corner_radius` | 24dp | 높이 48dp인 경로 바의 완전한 캡슐 모양 |
+| `file_list_path_bar_corner_radius` | 18dp | 높이 36dp인 경로 바의 완전한 캡슐 모양 |
 | `bookmark_bar_padding_horizontal` | 16dp | 첫·마지막 칩과 화면 가장자리 사이 |
 | `bookmark_chip_spacing` | 8dp | 칩 사이 간격 |
 | `bookmark_chip_max_width` | 200dp | 텍스트와 좌우 내부 여백을 포함한 전체 칩 상한 |
-| 기존 `tab_layout_height` | 48dp | 경로 바 높이 |
+| `file_list_path_bar_height` | 36dp | 즐겨찾기 칩의 보이는 높이와 맞춘 경로 바 높이 |
 | 기존 `touch_target_size` | 48dp | 칩 최소 터치 높이 |
 | 기존 `content_start_margin` | 기본 72dp, `sw600dp` 80dp | LIST 텍스트 시작점과 divider start |
 | 기존 `screen_edge_margin` | 기본 16dp, `sw600dp` 24dp | divider end 여백 |
@@ -598,7 +598,7 @@ JAVA_HOME="/c/Program Files/Android/Android Studio/jbr" ./gradlew lintDebug
 | lint | `lintDebug` 실행 완료. 이번 변경 파일의 새 오류는 없으나 기존 `VideoDetails.kt`의 Media3 `UnsafeOptInUsageError` 4건(92~94, 111행) 때문에 전체 task는 실패 |
 | LIST | 밝음·어두움·검정 야간에서 노란 채움 폴더와 폴더 행 divider 확인. 폴더 우선을 끈 혼합 목록에서 파일→파일에는 선이 없고 폴더 행 아래에만 선이 남는 것 확인 |
 | GRID·MEDIA | 두 보기 모두 노란 폴더 썸네일 확인. MEDIA 날짜 타일과 미디어 썸네일에는 LIST divider가 생기지 않음 |
-| 경로 바 | 16dp 논리 바깥 여백, 48dp 높이, 둥근 배경, 12dp 텍스트 시작, 긴 breadcrumb 가로 스크롤 확인 |
+| 경로 바 | 16dp 논리 바깥 여백, 36dp 높이, 둥근 배경, 12dp 텍스트 시작, 긴 breadcrumb 가로 스크롤 확인 |
 | 즐겨찾기 | `Screenshots` 칩 표시·48dp 터치 높이·탭 이동·현재 경로 checked 노출 확인. 현재 경로 칩을 다시 탭해도 펼친 검색이 유지되는 no-op 확인. 길게 누르면 편집 대화상자가 열리고 클릭 이동이 뒤따르지 않음 |
 | 오류 경로 | 존재하지 않는 기존 `Screenshots` 즐겨찾기로 이동했을 때 기존 `NoSuchFileException` 오류 화면을 표시하고 앱은 종료되지 않음 |
 | 테마 | M2/M3 각각 밝음·어두움·검정 야간의 6조합 확인. 밝은 바는 `#F1F3F4`, 두 야간 모드는 `#303134`; 검정 본문에서도 바가 구분됨 |

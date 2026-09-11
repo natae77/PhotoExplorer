@@ -69,7 +69,8 @@ class SwipeDownDismissLayout @JvmOverloads constructor(
 
     /** Whether this move turns into a drag of ours. Dominantly downwards, and nothing else wants it. */
     private fun shouldStartDrag(event: MotionEvent): Boolean {
-        if (isDragging || gestureRejected || event.pointerCount != 1 || !canDismiss()) {
+        if (isDragging || gestureRejected || event.pointerCount != 1 || !canDismiss()
+            || listener?.canStartDrag(this) == false) {
             return false
         }
         val offsetY = event.rawY - downRawY
@@ -235,9 +236,9 @@ class SwipeDownDismissLayout @JvmOverloads constructor(
 
     companion object {
         // How far down the page has to be before letting go closes the viewer.
-        private const val DISMISS_FRACTION = 0.25f
+        private const val DISMISS_FRACTION = 0.125f
         // How far a flick has to have gone before its speed counts for anything.
-        private const val FLICK_MIN_FRACTION = 0.1f
+        private const val FLICK_MIN_FRACTION = 0.05f
         // How much more vertical than horizontal a drag has to be before it becomes ours.
         private const val DIRECTION_RATIO = 1.5f
         private const val MAX_SCALE_DOWN = 0.2f
@@ -247,6 +248,8 @@ class SwipeDownDismissLayout @JvmOverloads constructor(
     }
 
     interface Listener {
+        /** False keeps the page fixed without consuming the touch while its folder tile prepares. */
+        fun canStartDrag(layout: SwipeDownDismissLayout): Boolean = true
         fun onDragStarted(layout: SwipeDownDismissLayout) {}
         fun onDragProgress(layout: SwipeDownDismissLayout, progress: Float) {}
         fun onDragCancelled(layout: SwipeDownDismissLayout) {}

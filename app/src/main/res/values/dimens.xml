@@ -62,7 +62,8 @@
 
     <dimen name="file_list_path_bar_margin_horizontal">16dp</dimen>
     <dimen name="file_list_path_bar_margin_bottom">8dp</dimen>
-    <dimen name="file_list_path_bar_corner_radius">24dp</dimen>
+    <dimen name="file_list_path_bar_height">36dp</dimen>
+    <dimen name="file_list_path_bar_corner_radius">18dp</dimen>
     <dimen name="bookmark_bar_padding_horizontal">16dp</dimen>
     <dimen name="bookmark_chip_spacing">8dp</dimen>
     <dimen name="bookmark_chip_max_width">200dp</dimen>

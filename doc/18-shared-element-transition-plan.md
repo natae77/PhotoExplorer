@@ -3,15 +3,18 @@
 미디어 모드에서 사진을 열면 **타일이 커지면서 뷰어가 되고**, 뷰어를 닫으면
 **미디어가 원래 타일 자리로 줄어들며 들어간다.** 지금의 좌우 슬라이드를 대체한다.
 
-- 작성일: 2026-09-04 / 최종 개정: **2026-09-11 (8차)**
+- 작성일: 2026-09-04 / 최종 개정: **2026-09-12 (11차)**
 - 프로젝트: **PhotoExplorer** (`natae77/PhotoExplorer`, `zhanghai/MaterialFiles` fork)
 - 기준 소스: `feature/media-view-mode` (`8c3e67d2` 시점)
-- 상태: **7차 아래 스와이프 접합 구현 완료 · 에뮬레이터 핵심 경로 검증, 확장 매트릭스 미검증** (§3.6.1·§5.6·§5.7)
+- 상태: **11차 최초 타일 빈칸·깜박임 핵심 경로 구현 및 3인 검토 보완 계획 반영**
 
 **개정 이력** — 이 문서는 개정할 때 새 문서를 만들지 않고 **본문을 직접 고친다.**
 
 | 개정 | 날짜 | 무엇이 바뀌었나 |
 |---|---|---|
+| 11차 | 2026-09-12 | A에서 열어 B로 넘긴 뒤 복귀하면 최초 타일 A가 빈칸으로 남거나 한 번 깜박이는 결함을 실제 구현에 맞춰 반영했다. 일반 `alpha`와 별개인 `transitionAlpha`를 포함해 프레임워크가 조작한 표시 상태를 정상화하고, B로 반환할 때 A의 `transitionName`을 잠시 떼어 후속 탐색·캡처에서 A가 다시 선택되지 않게 한다. 3인 검토 결과 반환 transition 종료 훅과 RecyclerView 재활용 정규화가 후속 구현으로 남았다 |
+| 10차 | 2026-09-12 | 좌우 이동 후 swipe-down 첫 프레임에 최초 타일이 비어 있다가 반환 직전에 현재 타일과 빈칸이 교환되는 결함을 반영했다. 최신 타일 READY 전에 최초/직전 타일을 복원하고 현재 썸네일만 숨겨, 폴더를 드러내기 전에 빈칸을 현재 위치로 옮기도록 했다 |
+| 9차 | 2026-09-11 | 에뮬레이터에서 최초 타일 A로 연 뒤 B로 넘겨 swipe-down하면 복귀 애니메이션이 끊기는 결함을 재현했다. 최초 `ActivityOptions`의 이름 A를 B로 바꿔 버린 caller callback이 원인이므로 **이름은 끝까지 A로 유지하고 대상 View만 B 타일로 교체**하도록 바로잡았다. 페이지 IDLE 때 아래 폴더를 현재 타일 위치로 미리 스크롤하는 세션·sequence number·pre-draw READY 계획과 레이스/폴백 검증을 추가했다 |
 | 8차 | 2026-09-11 | 7차 접합 계획을 구현했다. 반투명 Immersive 창의 검정 배경 알파, 내부 폴더 진입 표식, 드래그 콜백, 종료 상태기·입력 잠금을 연결하고 `PixelCopy` 준비 중 뷰 재생성도 안전하게 초기화했다. 빌드·단위 테스트와 에뮬레이터 핵심 경로 결과를 §5.7에 기록했다 |
 | 7차 | 2026-09-11 | 10번 5차 요구를 접합했다. 작은 이동량 임계값으로 아래 스와이프를 확정하면 뷰어 창의 검정 `windowBackground` 알파를 낮춰 **실제 폴더 화면을 사진 아래에 선노출**하고, 사진은 누적된 이동량을 따라잡은 뒤 손가락과 1:1로 움직인다. 드래그 중 배경 노출과 손을 놓은 뒤의 공유 요소 복귀를 분리했다(§3.6.1, D27) |
 | 6차 | 2026-09-11 | 문서 번호를 14 → **18**로 바로잡았다. 파일 목록 UI와 통합하면서 동영상 출력이 `TextureView`에서 HDR용 `SurfaceView`로 바뀐 것을 반영해, 현재 프레임 획득을 **`PixelCopy` 비동기 복사**로 수정했다(§3.5·§3.6, D26). 별도 통합 검증 문서의 결과와 미검증 범위를 §5.5에 합쳤다 |
@@ -52,7 +55,8 @@
 1. 미디어 모드에서 타일을 누르면 **그 타일이 커지면서** 뷰어가 된다.
 2. 뷰어를 닫으면 **지금 보고 있는 미디어**가 그 파일의 타일 자리로 줄어들며 들어간다.
    열 때와 다른 사진을 보고 있어도 그 사진의 타일로 간다.
-3. 돌아갈 타일이 화면 밖이면 **그리드가 먼저 그 자리로 스크롤한 뒤** 전환한다.
+3. 좌우로 넘겨 현재 타일이 화면 밖이 되면 **페이지가 정착한 시점에 아래 그리드를 미리 그 자리로
+   스크롤한다.** 아래로 끌기 시작 전부터 현재 타일이 보여야 한다.
 4. 사진(일반·대용량)과 동영상에서, **닫는 경로 셋 모두에서** 똑같이 동작한다.
 5. 짝이 될 타일이 없는 경우에는 **조용히 지금까지의 전환으로 돌아간다**(§3.7).
 
@@ -71,7 +75,7 @@
 |---|---|
 | 미디어 모드에서 타일 탭 | 타일이 전체 화면으로 커지며 뷰어. 배경은 함께 어두워진다 |
 | 뷰어에서 뒤로가기 / 위 화살표 / 아래로 끌기 | 현재 미디어가 그 파일의 타일로 줄어들며 들어간다 |
-| 뷰어에서 좌우로 넘긴 뒤 닫기 | **넘긴 그 파일의 타일**로 들어간다. 화면 밖이면 스크롤 후 |
+| 뷰어에서 좌우로 넘긴 뒤 닫기 | **넘긴 그 파일의 타일**로 들어간다. 화면 밖이면 페이지 IDLE 때 아래 그리드를 미리 스크롤 |
 | 아래로 끌던 중에 놓아 닫힘 | 끌던 **그 자리·그 크기에서 이어서** 타일로 들어간다 (§3.6) |
 | 사진을 확대한 채로 뒤로가기 | 폴백 — 지금까지의 전환 |
 | 뷰어에서 파일을 삭제한 뒤 닫기 | 폴백 — 돌아갈 타일이 없다 |
@@ -166,6 +170,11 @@ FrameLayout                       (media_viewer_fragment.xml)
 복귀 시 `ActivityTransitionState.startExitBackTransition()` 도 그 이름으로 짝을 찾는다.
 **그래서 뷰어 쪽 뷰의 이름을 도중에 바꾸면 복귀가 깨진다.**
 
+9차에서 이것이 caller 쪽에도 똑같이 적용된다는 것을 실제 결함으로 확인했다. A 타일에서 열어 B로
+넘겨도 프레임워크의 프로토콜 키는 **최초 이름 A**다. B는 복귀할 **대상 View를 고르는 경로**일 뿐,
+이름을 B로 바꾸라는 뜻이 아니다. 양쪽 콜백의 성공 경로에서 `names`는 건드리지 않고
+`sharedElements[A] = tileB`만 설정한다. 이름 목록과 map을 함께 비우는 것은 타일이 없는 폴백뿐이다.
+
 **결론(D15) — 뷰어의 `transitionImage` 에는 `transitionName` 을 붙이지 않는다.**
 대신 `onMapSharedElements` 로 지도에 직접 넣는다.
 
@@ -186,7 +195,7 @@ onSharedElementStart   ← §3.3이 그림을 채우는 자리
 증상은 §7 최상위 위험("스냅샷이 비어 온다")과 구분이 안 된다.
 
 **종료 훅(§3.6)에서 `isReturning` 을 세우고, 그때만 가드를 적용한다.**
-그리드 쪽이 `pendingReturnPath == null` 로 방향을 가리는 것(§3.4 (3))과 같은 문제이고 같은 해법이다.
+그리드 쪽이 `Opening / Returning / ReturnBlocked`로 방향을 가리는 것(§3.4.6)과 같은 문제이고 같은 해법이다.
 
 ```kotlin
 override fun onMapSharedElements(names: MutableList<String>, sharedElements: MutableMap<String, View>) {
@@ -310,63 +319,171 @@ fun mediaTransitionName(path: Path): String = "media:$path"
 `windowBackground` 알파를 전환에 맞춰 올려 준다. 뷰어 테마의 배경은 `ColorDrawable`(검정)이라
 알파가 먹는다.
 
-### 3.4 닫을 때 (뷰어 → 그리드) — 돌아갈 자리 찾기
+### 3.4 닫을 때 (뷰어 → 그리드) — 현재 타일을 미리 준비한다
 
-열 때 준 이름은 **닫을 때 유효하지 않을 수 있다.** 사용자가 좌우로 넘겼으면 다른 파일이다.
-표준 해법은 셋이 한 벌이다.
+두 값의 역할을 섞지 않는다.
 
-**(1) 뷰어가 현재 경로를 결과로 돌려준다.**
-`MediaViewerFragment` 가 페이지가 바뀔 때마다(그리고 종료 훅에서)
-`activity.setResult(RESULT_OK, Intent().apply { extraPath = currentPath })`.
+- **최초 진입 이름**: 공유 요소 코디네이터가 끝까지 사용하는 불변 프로토콜 키.
+- **현재 경로**: 지금 어느 타일 View로 돌아갈지를 고르는 가변 값.
+
+#### 3.4.1 현재 경로는 종료 결과로 계속 보관한다
+
+`MediaViewerFragment`는 페이지가 확정될 때마다, 그리고 종료 훅에서
+`activity.setResult(RESULT_OK, Intent().apply { extraPath = currentPath })`를 갱신한다.
 ⚠️ **위치(index)가 아니라 경로**를 돌려준다. 뷰어 안에서 파일을 삭제하면 목록이 밀려 위치가 어긋난다.
-전환할 수 없는 상태면 **`setResult(RESULT_CANCELED)` 로 되돌린다**(§3.7 F4·F5).
+전환할 수 없는 상태면 **`setResult(RESULT_CANCELED)`** 로 되돌린다(§3.7 F4·F5).
 
-**(2) `FileListActivity.onActivityReenter(resultCode, data)`** 를 재정의해 프래그먼트로 넘긴다.
-이것은 복귀 전환이 **시작되기 전에** 호출되는, 바로 이 용도의 훅이다.
-`FileListActivity` 는 이미 `fragment` 필드를 들고 있다
-([FileListActivity.kt:23](../app/src/main/java/me/zhanghai/android/files/filelist/FileListActivity.kt#L23)) —
-다만 **`lateinit` 이므로 `if (!::fragment.isInitialized) return` 을 먼저 둔다.** §7의
-"파괴 후 재생성" 위험이 한 겹 줄어든다.
-`FileListFragment` 은 `FileListActivity` 에서만 호스팅되므로 이 한 곳으로 충분하다.
-받은 경로를 **`pendingReturnPath` 필드에 담아 둔다.**
+#### 3.4.2 페이지 IDLE 때 아래 폴더를 선행 정렬한다 (9차)
 
-⚠️ **여기서 먼저 뷰 모드를 본다.** 동영상은 리스트·바둑판 모드에서도 `openMediaViewer` 를 타므로
-(§3.0), 가드가 없으면 **전환은 없는데 목록만 점프하는** 회귀가 생긴다.
-`viewModel.viewType != FileViewType.MEDIA` 면 아무것도 하지 않고 빠진다(F1).
-
-**(3) exit 콜백에서 재매핑한다.**
-`ActivityCompat.setExitSharedElementCallback(requireActivity(), …)` 을
-**`FileListFragment` 의 뷰 생성 시점에 한 번만** 등록한다. 재진입 코디네이터가
-`activity.mExitTransitionListener` 를 그때 읽으므로 **뷰어를 띄우기 전에 이미 걸려 있어야 한다.**
-(§3.2.2와 짝이 되는 항목이다.)
-
-`onMapSharedElements` 에서 `pendingReturnPath` 의 타일로 이름을 다시 매핑한다.
-
-⚠️ **호출 측의 exit 콜백은 뷰어를 띄우는 순간에도 불린다.** 복귀 전용이 아니다.
-무조건 재매핑하면 열기가 망가지고, 스테일 값이 남으면 다음 실행에 적용된다.
-그래서 `pendingReturnPath` 가 `null` 이면 아무것도 하지 않고,
-**비우는 것은 "쓰는 즉시"가 아니라 "다음에 뷰어를 띄울 때"** 로 한다 —
-`onMapSharedElements` 가 두 번 불리는 기기에서 두 번째 호출이 열 때의 원래 타일로 되돌려 버린다.
-스테일 방지라는 목적은 그대로 달성되고 재호출에 강하다.
-
-**화면 밖이면 스크롤한다.** `onActivityReenter` 안에서:
+종료 시점의 `onActivityReenter()`에서 처음 스크롤하면 swipe-down 중에는 사용자가 떠나온 옛
+뷰포트가 보인다. MEDIA 모드 내부 실행에서는 뷰어가 불투명한 동안 미리 준비한다.
 
 ```
-requireActivity().supportPostponeEnterTransition()
-layoutManager.scrollToPositionWithOffset(targetPosition, offset)
-recyclerView.doOnPreDraw { requireActivity().supportStartPostponedEnterTransition() }
+FileList open:  sessionId 생성 + listener 등록 + intent 전달
+Viewer IDLE:    request(sessionId, currentPath) → coordinator가 sequence 발급
+FileList:       이미 보임 → READY
+                화면 밖 → scrollToPositionWithOffset → pre-draw 확인 → READY
+                타일/화면 없음 → UNAVAILABLE
+Viewer:         같은 sessionId + sequence + path의 READY만 수락
 ```
 
-- ⚠️ **`doOnPreDraw` 를 반드시 걸어야 한다.** 스크롤 직후에는 타일 뷰가 아직 없어서
-  `onMapSharedElements` 가 `null` 을 받고, 전환이 조용히 폴백으로 떨어진다.
-- ⚠️ **`supportPostponeEnterTransition()` 은 `FragmentActivity` 의 메서드**다.
-  프래그먼트에서는 `requireActivity()` 를 거친다.
-- **`offset` 은 실기기에서 눈으로 정한다.** RecyclerView 는
-  [CoordinatorScrollingFrameLayout](../app/src/main/java/me/zhanghai/android/files/ui/CoordinatorScrollingFrameLayout.kt)
-  안에 있고 그 Behavior 가 `ScrollingViewBehavior` 라 **내용이 이미 앱바 아래에서 시작한다.**
-  앱바 높이를 더할 이유가 없다. 화면 가운데에 오게 하려면 `(recyclerView.height - tileHeight) / 2` 쪽이다.
-- ⚠️ **`postpone` 을 걸고 `start` 를 못 부르면 화면이 멈춘다.** `view == null` / `!isAdded`
-  가드와 시간 제한을 함께 둔다(§7).
+- 새 프로세스 내부 `MediaViewerViewportCoordinator`가 양쪽을 연결한다. `sessionId`는 내부 MEDIA
+  실행마다 새로 만들고, 목록·바둑판 동영상 및 외부 `VIEW`에는 넣지 않는다. 전역 현재 액티비티나
+  경로 하나만 두면 멀티 윈도우·복수 task가 섞이므로 금지한다.
+- coordinator는 세션별 sequence number를 원자적으로 발급하고 최신 요청과 응답을 replay한다.
+  번호를 뷰어 필드에서 증가시키면 재생성 후 0으로 되감겨 이전 요청보다 영원히 오래된 것으로 처리될 수 있으므로 금지한다.
+  FileList listener는 `onViewCreated`부터 `onDestroyView`까지 등록해 위의 뷰어 때문에 PAUSED인 동안에도
+  요청을 받으며, RESUMED에만 묶지 않는다. UI owner의 장기 강한 참조는 남기지 않는다. 새 뷰어 실행과
+  정상 종료에서는 세션을 폐기하고, 구성 변경에서는 같은 token으로 재등록해 최신 요청을 즉시 replay한다.
+  프로세스 복원 뒤 양쪽이 다시 연결되지 않으면 검정 폴백이다.
+- `publishCurrentViewportIfIdle()` 하나를 두고 최초 pager pre-draw, **`onPageScrollStateChanged(IDLE)`**,
+  paths 삭제·replace와 currentItem 보정 직후에 호출한다. 빠른 플링 중 지나가는 `onPageSelected`마다
+  폴더를 스크롤하지 않고, 이미 IDLE인 채 같은 index의 경로만 바뀌는 경우도 놓치지 않는다.
+- 새 `isMediaTileFullyVisible(path)`가 타일 전체 사각형이 RecyclerView의 padding을 제외한 뷰포트
+  안에 든 것을 확인하면 스크롤 없이 즉시 READY다. holder가 붙어 있어도 일부가 잘렸으면 화면 밖으로
+  보고, `smoothScroll` 대신 `scrollToPositionWithOffset(position, mediaReturnScrollOffset())` 한 번만 호출한다.
+- viewport READY는 단순 스크롤 호출 완료가 아니다. pre-draw에서 위치를 다시 조회하고 holder가 현재
+  경로에 해당하며 attach·layout 상태이고, 크기가 0보다 크며 전체 사각형이 뷰포트 안인지 확인한 결과다.
+  **타일의 자리와 크기만**
+  요구하고 Coil drawable 로딩은 기다리지 않는다. 제한된 재시도와 별도 준비 시간 제한 후 UNAVAILABLE이다.
+- A→B→C처럼 빠르게 바뀌면 B의 늦은 pre-draw가 C를 덮어쓰면 안 된다. 요청·pre-draw·응답 양쪽에서
+  `sessionId + sequence + path`가 모두 최신인지 다시 검사하고, 오래된 콜백은 no-op으로 버린다.
+  `returnMappingState`는 종료 전환 전용으로 남기고 이 선행 상태와 공유하지 않는다.
+- adapter data·정렬·filter·span/layout 변화와 view 파괴는 기존 READY를 준비 중 상태로 무효화한다.
+  최신 요청을 새 위치에서 다시 처리하고, 목록이 아직 로딩 중이면 곧바로 UNAVAILABLE로 굳히지 않고
+  제한 시간 안에서 데이터 갱신과 pre-draw를 기다린다. `AdapterDataObserver` 또는 목록 갱신 완료 훅에서
+  현재 타일이 여전히 완전히 보이는지 재검증한다.
+
+#### 3.4.3 READY 전에 빈칸을 현재 타일로 옮긴다 (10차)
+
+프레임워크는 뷰어를 연 최초 타일 A를 원본 공유 요소로 숨겨 둔다. A에서 B로 넘긴 뒤 스크롤만
+미리 맞추면 swipe-down 첫 프레임에는 A가 빈칸이고, 반환 전환이 시작될 때 A가 갑자기 채워진 뒤
+B가 비는 교환이 그대로 보인다. 폴더 준비는 위치뿐 아니라 **어느 타일을 비워 둘지**까지 끝내야 한다.
+
+- MEDIA 공유 요소 실행을 시작할 때 `mediaViewportHiddenPath = A`로 둔다.
+- 최신 요청의 타일 B가 attach·layout된 것을 확인한 뒤, 기존 hidden path A의 썸네일을 다시 보이고
+  B의 썸네일은 `visibility`가 아니라 `alpha = 0`으로 숨긴다. View의 자리와 반환 전환 캡처 가능 상태를
+  유지한 채, 이 교환은 검정 window background가 불투명한 동안 끝낸다.
+- 타일의 `View` 참조를 장기 보관하지 않고 경로만 보관한다. RecyclerView가 holder를 재활용하면 bind
+  시 현재 hidden path인지 다시 적용하고, 다음 READY 검사에서도 실제 holder에 같은 상태를 적용한다.
+- 아이콘·배지·날짜 타일까지 통째로 숨기지 않는다. 움직이는 미디어와 중복되는 썸네일 이미지만 숨겨
+  B의 자리는 유지한다.
+- `READY`는 스크롤과 이 빈칸 교환이 모두 끝난 뒤에만 보낸다. 따라서 swipe-down이 허용되는 순간에는
+  A가 채워져 있고 B 자리만 비어 있다.
+- 취소로 뷰어에 머물면 B를 계속 비워 둔다. C로 넘기면 B를 복원하고 C를 비운다. 정상·일반 종료,
+  세션 폐기, 목록 교체, 화면 파괴에서는 남은 hidden path를 복원한다.
+- 최종 return callback은 숨겨진 현재 타일도 대상 View로 찾을 수 있어야 한다. `isVisible`을 요구하는
+  열기용 조회와, 숨겨진 View도 허용하는 반환용 조회를 분리한다.
+
+#### 3.4.4 준비 상태가 아래 스와이프 노출을 결정한다
+
+`ViewPager2`가 IDLE이고 현재 요청 상태가 READY일 때만 실제 폴더를 드러낸다.
+
+| 상태 | 아래 스와이프 |
+|---|---|
+| `REVEAL_READY(currentPath)` | 정상적으로 확정하고 첫 사진 이동 프레임부터 준비된 폴더를 노출 |
+| `WAIT` | 사진을 고정하고 터치를 아직 가로채지 않음. READY가 되면 다음 MOVE에서 누적량을 따라잡아 시작 |
+| `BLACK_FALLBACK` | 사진 드래그·닫기는 허용하되 검정 배경 유지. 종료 시 §3.4.5의 최종 준비를 다시 시도 |
+| 세션 없음(F1·F2) | 공유 요소와 폴더 선노출 없이 기존 검정 배경의 일반 종료 |
+
+WAIT의 시간 제한은 제스처 인식 타이머가 아니다. 페이지 IDLE 직후 시작한 폴더 레이아웃 준비의
+안전 종료일 뿐이며, 아래 제스처의 `touchSlop`·이동량 판정에는 시간을 섞지 않는다.
+
+#### 3.4.5 `onActivityReenter()`는 최종 안전망이다
+
+선행 준비가 UNAVAILABLE이었어도 반환 결과의 현재 경로를 다시 확인한다. `preparedPath`와 결과 경로가
+같고 현재 타일이 실제로 붙어 있을 때만 바로 전환한다. 아니면 기존처럼 return transition을 postpone하고,
+스크롤 후 pre-draw에서 타일을 재검증한 뒤 시작한다. `view == null` / `!isAdded` 가드와 시간 제한을
+두며, 시작하지 못하면 names와 map을 비우고 일반 폴백으로 끝낸다. 최종 반환 요청이 선행 준비보다
+항상 우선하고, 반환 준비가 시작되면 이전 sequence를 무효화한다.
+
+#### 3.4.6 exit 콜백은 이름이 아니라 View만 바꾼다
+
+`ActivityCompat.setExitSharedElementCallback()`은 뷰어를 열기 전에 등록한다. 방향과 실패를
+`Opening / Returning(path) / ReturnBlocked` 삼상태로 표현한다. `null/non-null` 두 상태만 쓰면
+복귀 대상이 없을 때를 opening과 구분하지 못해 최초 A 타일의 기본 매핑이 살아난다.
+
+- 새 뷰어를 열 때 `Opening`.
+- `onActivityReenter()`가 시작되면 먼저 `ReturnBlocked`. 결과와 현재 MEDIA 목록·뷰가 유효하고 최종
+  타일 준비가 가능할 때만 `Returning(path)`.
+- callback에서 `Opening`은 기존 open map을 그대로 두고, `ReturnBlocked`는 names와 map을 함께 비운다.
+  `Returning(path)`만 아래의 View 재매핑을 한다. FileList view가 아직 없으면 blocked 상태를 보존했다가
+  view 생성 뒤 최종 준비를 다시 시도한다.
+
+반환 시에는 `Returning(path)`의 타일을 찾되, 성공 경로의 `names`는 **절대 수정하지 않는다.** 현재 코드는
+`mediaTransitionName(path)`로 이름까지 교체해 A에서 열고 B로 넘겼을 때 양쪽 프로토콜 키가 달라지는
+결함이 있다. 올바른 형태는 다음과 같다.
+
+```kotlin
+val originalName = names.firstOrNull() ?: return
+val path = (returnMappingState as? Returning)?.path ?: return
+val tile = mediaTileImageFor(path) ?: run {
+    names.clear()
+    sharedElements.clear()
+    return
+}
+sharedElements.clear()
+sharedElements[originalName] = tile
+```
+
+호출 측 exit 콜백은 열 때도 불리므로 `Opening`이면 아무것도 하지 않는다. 반환 상태는 다음 뷰어를
+열 때 `Opening`으로 초기화하고, 반환 콜백이 여러 번 불릴 수 있으므로 사용 직후에는 비우지 않는다.
+
+#### 3.4.7 최초 타일의 프레임워크 전환 상태도 복원한다 (11차)
+
+10차 구현에서 A의 썸네일에 `alpha = 1`만 다시 주면 두 문제가 남았다. A→B 뒤 복귀가 끝나도 A가
+계속 빈칸인 경우가 있었고, 전환 종료 시 A가 한 번 깜박였다. Android 공유 요소 전환은 일반
+`View.alpha`와 별도로 합성되는 `transitionAlpha`를 사용하고, layout/focus 부작용 없이 visibility flag를
+바꾸는 전환용 setter도 사용한다. 따라서 일반 alpha와 visibility만 되돌려서는 프레임워크가 조작한
+표시 상태가 남을 수 있다. A View의 원래 이름을 잠시 떼는 것은 최초 map 결과를 바꾸기 위해서가 아니라,
+callback 이후의 이름 재탐색·재호출·capture에서 A가 다시 선택되는 것을 막는 방어다.
+
+- `mediaOpeningSharedElementPath`에 최초 경로 A를 세션 동안 별도로 보관한다. 현재 빈칸 경로
+  `mediaViewportHiddenPath`와 합치지 않는다. 구성 변경을 위해 saved state에도 문자열 경로를 보존한다.
+- B READY를 확정하는 pre-draw에서 A의 `visibility = VISIBLE`, 일반 `alpha = 1`,
+  `transitionAlpha = 1`을 적용하고 전환용 visibility setter로 visibility flag도 정상화한 뒤 B의 일반
+  `alpha = 0`을 적용한다. 이 교환이 끝난 다음에만 검정 배경을 낮춘다. API 29 이상은 공개 View API를
+  쓰고, API 23~28은 프로젝트의 기존 hidden-API 호환 방식으로 같은 메서드를 호출한다.
+- 손을 놓아 닫힘이 확정된 뒤 `Returning(B)` callback에서는 **B tile과 original name을 먼저 검증**한다.
+  둘이 모두 유효하고 A와 B가 다를 때만 A의 `transitionName`을 `null`로 만들고 표시 상태를 다시
+  정상화한 다음 `sharedElements[originalNameA] = tileB`로 B를 반환 대상에 넣는다. 폴백이면 A 이름을
+  건드리지 않고 names와 map만 비운다. 프로토콜 키 A 자체는 바꾸지 않는다.
+- 반환 overlay가 B로 들어가는 동안 A는 계속 표시하고 B의 실제 썸네일은 숨긴다. **Activity Result
+  수신은 반환 애니메이션 완료 신호로 간주하지 않는다.** 성공 경로에서는 caller의 shared-element
+  reenter transition `onTransitionEnd`/`onTransitionCancel`에서 한 번만 B를 표시하고
+  `A.transitionName = mediaTransitionName(A)`와 A의 표시 상태를 복원한 뒤 세션을 정리한다.
+  `ReturnBlocked`처럼 전환이 시작되지 않은 경로와 view 파괴는 즉시 정리하는 안전망을 둔다.
+- 전환 상태는 경로가 아니라 ImageView 인스턴스에 남는다. A 경로와 이름 분리 상태는 transition 종료까지
+  유지한다. adapter bind/recycle 및 child 재부착에서 모든 썸네일의 전환 상태를 기본값으로 정규화하되,
+  세션 중 분리 대상 A에는 `transitionName = null`, 현재 빈칸 B에는 일반 `alpha = 0`을 다시 적용한다.
+  A holder가 붙어 있지 않다고 경로를 먼저 버리지 않으며, 세션 종료 시 해당 adapter position을
+  무효화해 cached holder도 다음 attach 전에 정상화한다.
+- A로 다시 넘겨 A에 반환하는 경우에는 이름을 떼지 않는다.
+
+사용자에게 보이는 순서는 **B READY 교환 → 폴더 첫 노출 → UP 닫힘 확정 → 반환 매핑 → reenter
+transition 종료/cancel → 세션 정리**다. 현재 코드는 API 36의 A→B swipe-down 핵심 경로에서 빈칸과
+깜박임을 없앴다. 위의 명시적 transition 종료 훅과 holder 재활용 정규화는 3인 검토에서 확인된
+후속 구현 항목이다.
 
 ### 3.5 현재 페이지의 상태를 **한 곳에서** 묻는다
 
@@ -476,7 +593,7 @@ java.lang.IllegalArgumentException: Software rendering doesn't support hardware 
 
 ### 3.6 종료 훅 — 닫는 경로 셋을 한 자리로 모은다
 
-§3.2.1의 `isReturning`, §3.4 (1), §3.5의 그림, 아래 (1)·(2)가 모두 "종료 직전"에 일어나야 하는데,
+§3.2.1의 `isReturning`, §3.4.1의 최종 결과, §3.5의 그림, 아래 (1)·(2)가 모두 "종료 직전"에 일어나야 하는데,
 **지금 코드에는 그런 자리가 없다.** `MediaViewerFragment` 가 `OnBackPressedCallback` 을 걸고
 처리한다. 사진과 재생 전 동영상은 한 프레임에 끝나고, 재생 중 `SurfaceView` 동영상만
 §3.5.2의 비동기 복사를 먼저 기다린다.
@@ -491,7 +608,7 @@ activity.onBackPressedDispatcher.addCallback(viewLifecycleOwner) {
     //    없으면 채우지 않는다 → §3.2.1 가드가 전환을 끊는다 (F4·F5)
     // 2. 아래로 끌던 변형을 옮겨 받는다 (아래 (2))
     // 3. viewPager · appBarLayout · playerControlView 를 감춘다 (아래 (1))
-    // 4. setResult (§3.4 (1)) — 그림이 없으면 RESULT_CANCELED
+    // 4. setResult (§3.4.1) — 그림이 없으면 RESULT_CANCELED
     requireActivity().finishAfterTransition()
 }
 ```
@@ -538,8 +655,9 @@ D12는 유지된다. 페이지를 되돌리지 않으므로 한 프레임 튀지
 | 시점 | 보이는 것 | 전환 상태 |
 |---|---|---|
 | 임계값 전 | 사진과 검정 배경 유지 | 경과 시간과 무관하게 공유 요소 복귀는 시작하지 않음 |
+| 폴더 준비 `WAIT` | 사진과 검정 배경 유지 | 타일 READY 전에는 드래그를 확정하거나 옛 폴더를 노출하지 않음 |
 | 드래그 확정 직후 | 검정 window background가 85% 알파가 되어 실제 폴더 화면이 비치기 시작 | 공유 요소 복귀는 아직 시작하지 않음 |
-| 드래그 중 | 확정 순간 누적 이동량을 따라잡고, 폴더 화면 위에서 사진이 손가락과 1:1로 움직임 | `FileListActivity`는 아래에서 그대로 유지 |
+| 드래그 중 | 확정 순간 누적 이동량을 따라잡고, 폴더 화면 위에서 사진이 손가락과 1:1로 움직임 | 최초 타일은 채워지고 현재 타일 자리만 비어 있는 `FileListActivity`를 유지 |
 | 취소 | 사진과 검정 배경이 같은 200ms 동안 원상 복귀 | 복귀 전환 없음 |
 | 닫힘 확정 | 끌던 사진 위치·크기를 `transitionImage`가 이어받음 | 이때 처음 `finishAfterTransition()` 시작 |
 
@@ -550,12 +668,17 @@ return coordinator를 MOVE 중에 시작하면 취소할 수 없고, 손가락�
 끝날 수 있으므로 기존 종료 훅은 UP의 닫힘 확정 시점까지 호출하지 않는다(D27).
 
 뷰어는 평소 window background 알파 255로 지금과 같은 검정 배경을 유지한다.
-`FileListFragment.openMediaViewer()`의 명시적 실행에서만 “아래에 폴더 화면이 있음” extra를 주고
-배경 알파를 낮춘다. 공용 `maybeAddMediaViewerExtras()`에는 넣지 않는다. 이 extra와 `hasSharedElement`는 다르다.
-리스트·바둑판 모드의 동영상은 공유 요소가 없어도 아래에 폴더 화면은 있으므로 드래그 중 선노출할
-수 있다. 반대로 외부 `VIEW` 인텐트는 검정 배경을 유지해 다른 앱이나 런처를 드러내지 않는다.
+`FileListFragment.openMediaViewer()`의 **MEDIA 모드 공유 요소 실행**에서만 “아래에 폴더 화면이 있음”
+extra와 §3.4의 viewport session을 주고 배경 알파를 낮춘다. 공용 `maybeAddMediaViewerExtras()`에는
+넣지 않는다. 리스트·바둑판 모드 동영상은 아래 목록을 임의로 움직이지 않고 검정 배경의 기존 닫기를
+유지한다(F1). 외부 `VIEW`도 검정을 유지해 다른 앱이나 런처를 드러내지 않는다.
 
-확정 순간 배경 알파는 85%로 낮추고 실제 이동량 25%에서 0%가 되도록 선형으로 줄인다. 사진 이동과
+내부 extra만으로는 부족하다. `ViewPager2`가 IDLE이고 coordinator가 현재 path를 READY로 응답한
+경우에만 첫 이동과 배경 노출을 허용한다. READY 전에는 사진을 고정하고, READY가 되면 다음 MOVE에서
+누적 이동량을 따라잡는다. 준비 실패는 사진 아래를 검정으로 둔 일반 폴백이며 옛 폴더 뷰포트를
+대신 보여 주지 않는다.
+
+확정 순간 배경 알파는 85%로 낮추고 실제 이동량 12.5%에서 0%가 되도록 선형으로 줄인다. 사진 이동과
 배경 변경은 같은 MOVE/vsync에 반영한다. “폴더가 먼저”는 별도 이전 프레임이 아니라 **사진의 첫 이동
 프레임에 이미 폴더가 보인다**는 뜻이다. 시스템 바는 뷰어가 계속 소유하고 드래그 중 바꾸지 않는다.
 
@@ -589,8 +712,8 @@ return coordinator를 MOVE 중에 시작하면 취소할 수 없고, 손가락�
 들어올 때 공유 요소가 실제로 매핑됐는지를 기억해 두고(`hasSharedElement`), 아니면
 종료 훅에서 아무것도 건드리지 않고 그냥 끝낸다.
 
-⚠️ **F4·F5는 "결과를 안 돌려준다"로도 안 걸러진다.** §3.4 (1)이 `onPageSelected` 마다
-`setResult(RESULT_OK, …)` 를 하므로, 확대한 채 뒤로가기를 눌러도 **직전 페이지의 결과가 이미
+⚠️ **F4·F5는 "결과를 안 돌려준다"로도 안 걸러진다.** §3.4.1이 페이지 IDLE마다
+`setResult(RESULT_OK, …)` 를 갱신하므로, 확대한 채 뒤로가기를 눌러도 **직전 페이지의 결과가 이미
 설정되어 있다.** 반드시 `RESULT_CANCELED` 로 덮어써야 한다.
 
 ⚠️ **F3에서 `sharedElements` 만 비우면 부족하다.** `names` 도 함께 비운다.
@@ -664,25 +787,40 @@ ANDROID_HOME="C:\Users\hskang\AppData\Local\Android\Sdk" JAVA_HOME="/c/Program F
   **화면으로는 거의 같아 보인다.** 로그로 갈라야 한다.
 
 ### 6단계 — 뷰어가 현재 경로를 결과로 돌려주기
-- `onPageSelected` 와 종료 훅에서 `setResult(RESULT_OK, …)` (§3.4 (1)).
+- 페이지가 IDLE로 확정된 때와 종료 훅에서 `setResult(RESULT_OK, …)` (§3.4.1).
 - `currentPageContent()` 가 `READY` 가 아니거나 확대 중이면 **`RESULT_CANCELED`**(F4·F5).
 - **확인**: 겉보기 변화 없음. `logcat` 으로 결과 코드가 상황에 맞게 나가는지 본다.
 
 ### 7단계 — 복귀 매핑
-- `FileListFragment` 뷰 생성 시점에 `setExitSharedElementCallback` 등록 (§3.4 (3)).
-- `FileListActivity.onActivityReenter` → `isInitialized` 가드 → 프래그먼트 →
-  **미디어 모드 가드**(F1) → `pendingReturnPath`.
-- `onMapSharedElements` 재매핑, **비우는 것은 다음에 뷰어를 띄울 때** (§3.4 (3)).
+- `FileListFragment` 뷰 생성 시점에 `setExitSharedElementCallback` 등록 (§3.4.6).
+- `FileListActivity.onActivityReenter` → 프래그먼트의 상태를 먼저 `ReturnBlocked`로 설정 →
+  **미디어 모드·결과·경로·타일 가드** 통과 시에만 `Returning(path)`. 프래그먼트/뷰가 아직 준비되지
+  않았으면 blocked 상태와 결과를 보존해 생성 뒤 최종 준비를 재시도한다.
+- 최초 `ActivityOptions` 이름은 성공 경로에서 절대 바꾸지 않는다. 그 original name에 현재 경로의
+  타일 View만 연결한다(§3.2·§3.4.6). 타일이 없을 때만 names와 map을 함께 비운다.
+- `returnMappingState`는 다음에 뷰어를 띄울 때 `Opening`으로 바꾼다. 반환 콜백 재호출 중에는 유지한다.
 - **확인**: 화면에 보이는 타일 자리에서 창이 줄어든다. 좌우로 넘긴 뒤 닫아도 그 타일로 간다.
+  로그에서 viewer와 grid의 names가 최초 경로 이름으로 끝까지 같은지 확인한다.
   ⚠️ **아직 `transitionImage` 가 비어 있어 "빈 사각형이 줄어드는" 그림이다.** 자리만 본다.
   ⚠️ 열 때가 망가지지 않았는지 반드시 같이 본다(exit 콜백은 열 때도 불린다).
   ⚠️ **리스트 모드에서 동영상을 열고 닫아 목록이 점프하지 않는지 본다**(F1).
 
-### 8단계 — 화면 밖 타일로 닫기
-- `postpone` / `scrollToPositionWithOffset` / `doOnPreDraw`, 가드와 시간 제한 (§3.4).
-  `offset` 값을 눈으로 정한다.
-- **확인**: 20장 이상 넘긴 뒤 닫으면 그리드가 그 자리로 스크롤한 뒤 전환한다.
-  ⚠️ 실패하면 화면이 멈춘 것처럼 보인다.
+### 8단계 — 페이지 IDLE 때 화면 밖 타일 미리 준비하기
+- `MediaViewerViewportCoordinator`를 만들고 내부 MEDIA 실행의 `sessionId`를 intent와 폴더 쪽
+  saved state에 보존한다. 세션별 최신 `sequence + path + state`를 replay하며 listener는 뷰
+  생명주기에 맞춰 등록·해제한다(§3.4.2).
+- 뷰어는 최초 페이지·IDLE·삭제 후 경로 변경에서 요청한다. 폴더는 이미 보이면 즉시 READY,
+  아니면 `scrollToPositionWithOffset` 후 pre-draw에서 holder의 경로·attach·layout·가시성·크기를
+  재검증해 READY 또는 UNAVAILABLE을 응답한다.
+- 빠른 A→B→C의 모든 비동기 완료에서 sessionId/sequence/path 최신 여부를 재확인한다. 종료 준비가
+  시작되면 선행 요청을 무효화하고 최종 결과 경로를 우선한다.
+- `onActivityReenter`의 postpone/scroll/timeout은 제거하지 않고 선행 준비 실패의 안전망으로 둔다.
+- 최초 경로 A를 현재 hidden path와 별도로 보존한다. A→B 반환 callback에서는 target과 original name을
+  검증한 뒤 A의 `transitionName`을 잠시 제거하고 표시 상태를 정상화한다. reenter transition 종료/cancel
+  뒤 이름과 두 타일을 복원한다. adapter 재활용 중에도 이 상태를 bind에서 재적용한다(§3.4.7).
+- **확인**: 20장 이상 넘겨 IDLE이 된 뒤 아래로 끌기 전부터 그리드가 최종 타일 위치에 있고,
+  첫 노출 프레임에 그 타일이 보인다. 이미 보이는 한 칸 이동은 목록을 움직이지 않는다.
+  B 준비 응답을 늦춘 뒤 C로 넘겨도 B 위치로 돌아가지 않는다.
 
 ### 9단계 — 닫을 때 그림 채우기 ← *여기까지로 "닫기"가 완성된다*
 - 종료 훅에서 `isReturning = true`, `currentPageContent()` 의 그림을 `transitionImage` 에 (§3.5).
@@ -699,6 +837,9 @@ ANDROID_HOME="C:\Users\hskang\AppData\Local\Android\Sdk" JAVA_HOME="/c/Program F
 - 기존 Immersive Material 2·3 base에 `windowIsTranslucent=true`를 추가하고 검정
   `windowBackground`는 유지한다. 내부 폴더 진입 여부에 따라 그 drawable 알파만 제어한다(§3.6.1).
 - 드래그 중에는 공유 요소 전환을 시작하지 않는다. 취소 시 사진·배경을 같은 200ms로 복원한다.
+- `ViewPager2.IDLE + READY(currentPath)`를 폴더 선노출 시작 조건에 넣는다. 준비 중이면 `WAIT`으로
+  사진을 고정하고, 준비 불가이면 `BLACK_FALLBACK`으로 사진 드래그는 허용하되 검정 배경을 유지한다.
+  손을 놓은 뒤에는 최종 타일 준비를 다시 시도한다(§3.4.4·§3.4.5).
 - 드래그 중 사진 자체의 alpha 감소는 제거한다. 이동·축소·배경 alpha만 사용한다.
 - 종료 훅에서 손가락과 1:1로 이동한 페이지의 표시 변형을 `transitionImage` 로 옮긴다 (§3.6 (2)).
 - **확인**: 40% 끌어 닫기, 12% 빠르게 튕겨 닫기 둘 다 끌던 자리에서 이어진다.
@@ -764,8 +905,11 @@ ANDROID_HOME="C:\Users\hskang\AppData\Local\Android\Sdk" JAVA_HOME="/c/Program F
 **닫을 때**
 
 5. **뒤로가기·위 화살표·아래로 끌기 셋 다** 타일로 들어간다.
-6. 좌우로 넘긴 뒤 닫으면 **그 파일의** 타일로 간다.
-7. 그 타일이 화면 밖이면 그리드가 먼저 스크롤한다.
+6. A 타일에서 열어 B·C로 좌우 이동한 뒤 닫아도 최초 공유 요소 이름 A는 양쪽 콜백에서 유지되고,
+   사진은 **현재 파일 B·C의 타일 View**로 들어간다.
+7. 현재 타일이 화면 밖이면 페이지 IDLE 때 아래 그리드가 미리 스크롤한다. swipe-down 첫 노출
+   프레임에 현재 타일이 화면 안에 있고, 이미 보이는 타일이면 그리드 위치가 바뀌지 않는다.
+   최초 타일은 이미 다시 채워져 있고 현재 타일의 썸네일 자리만 비어 있어야 한다.
 8. 작은 이동량 임계값을 넘으면 사진이 누적 이동량을 따라잡아 손가락과 1:1로 움직이고, 사진이 움직이기 전에 실제 폴더 화면이 아래에 보인다. 놓으면 **끌던 자리에서 이어진다.** 튀지 않는다.
 9. 전환 중에 **같은 그림이 둘 보이지 않는다.**
 10. **가로 대용량 사진**이 마지막에 튀지 않는다.
@@ -785,6 +929,19 @@ ANDROID_HOME="C:\Users\hskang\AppData\Local\Android\Sdk" JAVA_HOME="/c/Program F
 17. 동영상 재생 중에 **셋 중 어느 방법으로 닫아도** 소리가 남지 않고 플레이어가 해제된다.
 18. 뷰어에서 파일을 삭제한 뒤에도 목록이 정상이다.
 19. **리스트·바둑판 모드에서 사진을 열면 예전처럼 기본 앱으로 나간다.**
+20. 빠른 다중 페이지 플링은 최종 IDLE 경로만 준비한다. 늦은 이전 sequence의 pre-draw/timeout은
+    폴더 위치나 READY 상태를 덮어쓰지 않는다.
+21. IDLE 직후 곧바로 swipe-down해도 이전 타일이 노출되지 않는다. 현재 타일 READY 전에는 사진이
+    고정되고, 준비되면 누적 이동량을 따라잡는다.
+22. A에서 B·C로 넘길 때 빈칸도 A→B→C로 이동한다. 검정 배경을 낮추기 전 교환이 끝나며, 되돌아간
+    타일은 즉시 원래 썸네일을 보인다.
+23. 삭제·정렬/목록 교체·holder detach·화면 재생성에서 준비 상태가 무효가 되면 잘못된 타일 대신
+    검정 배경과 일반 복귀로 안전하게 폴백한다.
+24. A에서 열어 B로 넘긴 상태에서 swipe-down 첫 노출 프레임부터 A는 계속 채워지고 B 자리만 비어
+    있다. 드래그를 취소하면 A의 이름과 표시 상태를 건드리지 않으며, 다시 swipe-down하거나 뒤로가기로
+    닫아도 B로 정상 반환한다. 반환 overlay가 B에 도착할 때까지 A는 숨거나 깜박이지 않고 B의 실제
+    썸네일은 나타나지 않는다. reenter transition 종료 다음 프레임에는 A와 B가 모두 채워지고 A 이름이
+    복구된다. 이후 B→A로 되돌려 닫기, A 다시 열기, 반환 중 holder rebind/recycle도 정상이어야 한다.
 
 ### 5.4 검증 결과 (5차)
 
@@ -872,7 +1029,7 @@ API 근거: [Android `PixelCopy`](https://developer.android.com/reference/androi
 | `assembleDebug` | 통합 직후와 호환성 수정 후 모두 성공 |
 | `testDebugUnitTest` | `DirectoryItemCountLoaderTest` 7개, 실패·오류 0 |
 | 목록 UI | 폴더 개수·파일 메타데이터·즐겨찾기 바·경로 바 표시 확인 |
-| 사진 열기 및 페이지 이동 후 복귀 | `photo_1` → `photo_2` 후 뒤로가기와 아래로 끌기 모두 `photo_2`로 재매핑 |
+| 사진 열기 및 페이지 이동 후 복귀 | `photo_1` → `photo_2` 후 뒤로가기와 아래로 끌기 모두 로그상 `photo_2` 타일을 선택했다. 당시에는 프레임 연속성과 양쪽 이름 일치를 확인하지 않아 9차 결함을 놓쳤다 |
 | 동영상 세 종료 경로 | `clip_1`에서 뒤로가기·툴바 화살표·아래로 끌기 각각 `PixelCopy result=0`, `RESULT_OK`, 그리드 재매핑 |
 | 손상 동영상 | `broken.mp4` 종료에서 공유 요소를 비우고 일반 종료, 목록 복귀 |
 | 크래시 | 위 실행 구간의 `AndroidRuntime` 오류 없음 |
@@ -909,18 +1066,64 @@ API 근거: [Android `PixelCopy`](https://developer.android.com/reference/androi
 §5.6 중 첫 이동 프레임의 순서, 동영상 `SurfaceView`·`PixelCopy`, 외부 `VIEW`, 화면 밖 타일,
 회전·재생성, 구형 API와 실기기 항목은 아직 검증하지 않았다.
 
+### 5.8 좌우 이동 후 복귀 결함 재현과 9차 검증 계획
+
+2026-09-11 Pixel 8 API 36 에뮬레이터의 `MixTest`에서 `photo_1` 타일로 열고 `photo_2`로 넘긴 뒤
+swipe-down했다. 폴더로 돌아가지만 `photo_2` 타일로 줄어드는 구간이 끊겼다. 로그는 다음 불일치를
+보였다.
+
+```
+viewer exit: setResult(OK) for .../photo_2.png
+viewer map: returning=true names=[media:.../photo_1.png] -> mapped
+grid map: returning to .../photo_2.png, names=[media:.../photo_1.png] -> remapped
+```
+
+현재 grid callback은 마지막 줄에서 이름을 `media:.../photo_2.png`로 바꾼다. viewer는 최초 이름
+`photo_1`을 유지하므로 반환 코디네이터의 짝이 깨진다. 녹화는
+`app/build/swipe_return_bug.mp4`에 남겼다(빌드 산출물, Git 비추적).
+
+9차 구현 후에는 다음을 프레임 녹화와 로그로 확인한다.
+
+- A로 열어 B/C 이동 후 뒤로가기·위 화살표·swipe-down: 양쪽 names는 끝까지 A이고 대상 View만 B/C.
+- 같은 뷰포트 한 칸, 날짜 구간을 넘는 20장 이상, 역방향 A→B→A, 다중 플링 A→D.
+- B READY를 늦춘 뒤 C로 이동: B 완료는 stale drop, 첫 swipe-down 프레임에는 C 타일.
+- IDLE 직후 즉시 아래로 끌기, 준비 중 취소, 준비 후 다시 끌기.
+- 현재 파일 삭제, 목록 교체·정렬, holder detach, 썸네일 로딩 중: 잘못된 타일 없이 폴백.
+- FileList/viewer 회전, “액티비티 유지 안 함”, 프로세스 복원, 복수 task: 세션 격리·재연결 또는 검정 폴백.
+- PhotoView·SSIV·동영상 썸네일·`SurfaceView`/`PixelCopy` × 화면 안/밖 × 종료 경로 셋.
+- 로그에 sessionId/sequence/path의 request→pre-draw→READY/UNAVAILABLE, 오래된 응답 폐기,
+  return originalName과 target path를 남겨 화면상 같은 실패를 구분한다.
+
+### 5.9 최초 타일 빈칸·깜박임 수정 검증 (11차)
+
+2026-09-12 Pixel 8 API 36 에뮬레이터의 `MixTest`에서 `photo_1`을 열고 `photo_2`로 넘긴 뒤
+swipe-down했다. 일반 alpha만 복원했을 때는 반환 완료 후 `photo_1` 칸이 계속 비어 있었고, 최초 경로를
+별도로 보관해 Activity Result 수신 시 `transitionAlpha`와 visibility flag까지 정상화하자 두 타일이 모두
+채워졌다. 다만 이 수신 시점을 실제 reenter transition 종료로 볼 수 없다는 검토 결과는 아래 후속 항목이다.
+그 뒤 반환 callback에서 최초 타일의 `transitionName`을 잠시 분리하도록 보완했고, 사용자의 육안
+확인에서 한 번의 깜박임도 사라졌다. 프레임 녹화로 판정한 결과는 아니다. `assembleDebug`,
+`testDebugUnitTest`, `git diff --check`가 통과했다.
+
+3인 검토에서 현재 Activity Result callback을 reenter transition 완료로 간주할 수 없고, holder
+rebind/recycle 때 전환 상태와 이름을 정규화하지 않는다는 두 후속 항목을 확인했다. 추가 검증은
+A→B→A, A→B→C, 화면 밖 B, swipe-down 취소·재시도, 뒤로가기·위 화살표·swipe-down 세 종료 경로,
+return callback 2회, transition cancel/null, 반환 중 notify/rebind/recycle과 회전을 포함한다. API 23과
+API 28에서는 reflection 성공·크래시 없음·최종 alpha/visibility를 각각 확인한다.
+
 ## 6. 바뀌는 파일
 
 | 파일 | 변경 | 단계 |
 |---|---|---|
 | `viewer/media/MediaTransition.kt` | **신규** — 이름 규칙만 | 2 |
+| `viewer/media/MediaViewerViewportCoordinator.kt` | **신규** — 내부 MEDIA 세션별 sequence number·최신 path와 READY/UNAVAILABLE 전달·replay·정리 | 8 |
 | `res/values/themes.xml`·`themes_material3.xml` | `windowActivityTransitions` 명시, 7차에서 기존 Immersive base에 `windowIsTranslucent=true` 추가. 검정 background 유지 | 1·10 |
-| `filelist/FileListAdapter.kt` | `transitionName` 설정/해제, `filePositionMap` 읽기용 접근자 | 2 |
-| `filelist/FileListFragment.kt` | 미디어 모드 사진 라우팅, `mediaTileImageFor`, 옵션 붙여 시작, exit 콜백 등록, 복귀 매핑·가드·스크롤, 내부 폴더 화면 표식 extra 전달 | 3·5·7·8·10 |
+| `compat/ViewCompat.kt` | 공유 요소 `transitionAlpha`와 전환용 setter를 통한 visibility flag 정상화 호환 함수. API 29 이상 직접 호출, API 23~28 reflection | 8·11 |
+| `filelist/FileListAdapter.kt` | `transitionName` 설정/해제, `filePositionMap` 읽기용 접근자. 11차 후속으로 bind/recycle 때 transition 상태 기본값과 세션의 A 이름 분리·B 일반 alpha 상태 재적용 | 2·11 |
+| `filelist/FileListFragment.kt` | 미디어 모드 사진 라우팅, session 등록·복원, adapter/layout 변화 시 READY 무효화·재검증, 현재 경로 선행 스크롤·pre-draw ACK, 삼상태 return mapping과 original name 유지, 현재 빈칸과 최초 경로의 분리, 최초 타일 전환 상태·이름 복원, 최종 복귀 가드·스크롤 | 3·5·7·8·10·11 |
 | `viewer/media/MediaViewerActivity.kt` | `fragment` 필드, `onSupportNavigateUp()`, **enter 콜백 등록**, 내부 진입 extra와 검정 window background 알파 API | 4·5·10 |
-| `viewer/media/MediaViewerFragment.kt` | 종료 훅·상태기·입력 잠금, `isReturning`, `hasSharedElement`, `currentPageContent()`, `transitionImage` 노출, `setResult`, 드래그 변형 이어받기, 검정 window background 제어, `SurfaceView` 프레임 `PixelCopy`와 completeOnce | 4·5·6·9·10 |
+| `viewer/media/MediaViewerFragment.kt` | 종료 훅·상태기·입력 잠금, IDLE path 요청과 READY gate, `isReturning`, `hasSharedElement`, `currentPageContent()`, `transitionImage`, 드래그 변형·배경 제어, `PixelCopy` | 4·5·6·8·9·10 |
 | `viewer/media/MediaViewerAdapter.kt` | **`allowHardware(false)` 두 줄만** (§3.5.1, D24) | 5 |
-| `viewer/media/SwipeDownDismissLayout.kt` | 이동량 임계값을 넘은 순간 누적 이동량 따라잡기, UP 실제 이동량 판정, 멀티터치 거부, 배경용 진행·취소 콜백 | 10 |
+| `viewer/media/SwipeDownDismissLayout.kt` | 이동량 임계값과 폴더 READY 시작 조건, 누적 이동량 따라잡기, UP 실제 이동량 판정, 멀티터치 거부, 배경용 진행·취소 콜백 | 10 |
 | `res/layout/media_viewer_fragment.xml` | `transitionImage` 추가. 별도 스크림 View는 추가하지 않음 | 5 |
 | `filelist/FileListActivity.kt` | `onActivityReenter` 전달 (+ `isInitialized` 가드) | 7 |
 
@@ -949,6 +1152,12 @@ API 근거: [Android `PixelCopy`](https://developer.android.com/reference/androi
 | 반투명 창이 공유 요소 전환·외부 VIEW 생명주기·메모리 사용을 바꾼다 | 중 | Immersive는 현재 뷰어만 사용한다. 검정 배경을 유지하고 §5.6의 enter/return·외부 VIEW·회전·"액티비티 유지 안 함" 매트릭스 확인. 문제가 크면 내부/외부 activity 분리 |
 | 외부 앱이나 런처가 사진 아래로 드러난다 | 중 | 검정 window background를 초기부터 유지하고, `openMediaViewer()`의 내부 extra가 있을 때만 알파를 낮춘다 |
 | 사진 취소와 배경 복귀가 어긋난다 | 중 | 같은 200ms·interpolator, 현재 page 소유권 확인, 새 drag/page 변경/view 파괴 때 animator 취소·alpha 255 복원 |
+| 빠른 A→B→C에서 B의 늦은 pre-draw가 폴더를 되돌린다 | 높음 | sessionId + sequence + path 모두 최신일 때만 scroll 완료와 READY를 반영하고 나머지 오래된 응답은 폐기 |
+| READY 전에 아래로 끌어 옛 폴더 타일이 노출된다 | 높음 | ViewPager IDLE과 READY(currentPath)를 시작 조건에서 함께 검사. WAIT은 사진 고정, BLACK_FALLBACK은 검정 유지 |
+| 아래 RecyclerView layout·썸네일 로딩이 뷰어 스와이프/재생을 끊는다 | 중 | 최종 IDLE만 publish, 이미 보이면 no-op, smooth scroll 금지, 최신 요청 1회만 layout. 20~40장 연속 플링과 동영상 시작 프레임 계측 |
+| coordinator가 파괴된 Fragment를 잡거나 복수 task 상태를 섞는다 | 높음 | 실행별 session token, lifecycle unregister·약한 owner, saved state 재등록/replay, 종료 시 세션 제거. 전역 current activity 금지 |
+| A→B 반환에서 최초 이름 A를 가진 원본 View가 다시 숨거나 깜박인다 | 높음 | 최초 경로를 별도 보존하고 유효한 반환 매핑 직전에 A 이름을 잠시 떼며 표시 상태를 정상화. Activity Result가 아니라 reenter transition 종료/cancel에서 이름 복구. A→B·A→B→A를 프레임 단위 확인 (§3.4.7) |
+| 반환 중 A holder가 detach/recycle되어 이름 분리나 전환 상태 복원이 다른 타일로 이동한다 | 높음 | transition 종료까지 A 경로·분리 상태를 유지하고 adapter bind/recycle/attach에서 기본 상태와 세션 예외를 재적용. cached holder position 무효화와 반환 중 notify 회귀 확인 (§3.4.7) |
 
 ## 부록. 확정된 결정 기록
 
@@ -982,3 +1191,7 @@ API 근거: [Android `PixelCopy`](https://developer.android.com/reference/androi
 | D26 | `SurfaceView` 동영상의 현재 프레임을 어떻게 얻을 것인가 (6차) | **`PixelCopy`로 비동기 복사한다.** 500ms 안에 성공하지 않거나 대상이 바뀌면 그림 없는 일반 종료로 폴백한다 (§3.5.2) |
 | D27 | 드래그 중 폴더 화면을 공유 요소 전환으로 보여 줄 것인가 (7차) | **아니다.** 반투명 뷰어 창의 검정 `windowBackground` 알파를 낮춰 아래 `FileListActivity`를 보여 주고, 공유 요소 복귀는 손을 놓아 닫힘이 확정된 뒤에만 시작한다 (§3.6.1) |
 | D28 | 검정 배경을 레이아웃 스크림으로 옮길 것인가 (7차 검토) | **옮기지 않는다.** 외부 VIEW의 inflate 전 노출과 기존 enter coordinator 전제를 지키기 위해 검정 `ColorDrawable` window background를 유지하고 그 알파만 바꾼다 |
+| D29 | 좌우로 넘긴 현재 타일이 화면 밖이면 언제 폴더를 스크롤할 것인가 (9차) | **페이지가 IDLE이 될 때 미리 스크롤한다.** 종료할 때 처음 움직이면 swipe-down 중 옛 뷰포트가 보인다. final `onActivityReenter` 스크롤은 안전망으로 유지한다 (§3.4) |
+| D30 | 좌우 이동 후 공유 요소 이름을 현재 경로로 바꿀 것인가 (9차) | **바꾸지 않는다.** 최초 ActivityOptions 이름은 불변 프로토콜 키이고 현재 경로는 대상 View 선택에만 쓴다. 성공 callback은 `sharedElements[originalName] = currentTile`만 한다 (§3.2·§3.4.6) |
+| D31 | 좌우 이동 뒤 어느 타일을 비울 것인가 (10차) | **현재 타일만 비운다.** 최신 타일이 READY 되기 전에 최초/직전 타일을 복원하고 현재 썸네일을 숨긴 뒤에만 폴더 선노출을 허용한다 (§3.4.3) |
+| D32 | 현재 타일 B로 반환할 때 최초 타일 A의 공유 요소 상태를 어떻게 할 것인가 (11차) | **유효한 B 매핑을 만들 때만 A View를 잠시 분리하고 표시 상태를 정상화한다.** 프로토콜 키 A는 유지한다. A 이름과 B 빈칸은 Activity Result 수신이 아니라 reenter transition 종료/cancel 뒤 복구하며, holder 재활용에도 같은 세션 상태를 재적용한다 (§3.4.7) |

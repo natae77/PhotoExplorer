@@ -102,6 +102,8 @@ class MediaViewerFragment :
     private var playerHolder: VideoPlayerHolder? = null
     private var renderedVideoPath: Path? = null
     private var returnState = ReturnState.IDLE
+    private var pagerScrollState = ViewPager2.SCROLL_STATE_IDLE
+    private var viewportStatus: MediaViewerViewportCoordinator.Status? = null
 
     private var isSystemUiVisible = true
 
@@ -147,6 +149,20 @@ class MediaViewerFragment :
             if (view != null && this::binding.isInitialized) binding.transitionImage else null
 
     private val swipeDownListener = object : SwipeDownDismissLayout.Listener {
+        override fun canStartDrag(layout: SwipeDownDismissLayout): Boolean {
+            if (layout !== currentPageRoot() || returnState != ReturnState.IDLE || isEntering) {
+                return false
+            }
+            val sessionId = (activity as? MediaViewerActivity)?.viewportSessionId ?: return true
+            if (pagerScrollState != ViewPager2.SCROLL_STATE_IDLE) return false
+            val status = viewportStatus
+            if (status == null || status.request.sessionId != sessionId
+                || status.request.path != currentPath) {
+                return false
+            }
+            return status.preparation != MediaViewerViewportCoordinator.Preparation.PENDING
+        }
+
         override fun onDragStarted(layout: SwipeDownDismissLayout) {
             if (!canRevealFileListBehind(layout)) return
             (activity as? MediaViewerActivity)
@@ -177,6 +193,21 @@ class MediaViewerFragment :
             && returnState == ReturnState.IDLE
             && !isEntering
             && (activity as? MediaViewerActivity)?.canRevealFileList == true
+            && pagerScrollState == ViewPager2.SCROLL_STATE_IDLE
+            && viewportStatus?.let {
+                it.request.path == currentPath
+                    && it.preparation == MediaViewerViewportCoordinator.Preparation.READY
+            } == true
+
+    private val viewportListener = MediaViewerViewportCoordinator.ViewerListener { status ->
+        val sessionId = (activity as? MediaViewerActivity)?.viewportSessionId
+        if (status.request.sessionId == sessionId) {
+            viewportStatus = status
+            if (status.preparation != MediaViewerViewportCoordinator.Preparation.READY) {
+                (activity as? MediaViewerActivity)?.setViewerBackgroundAlpha(1f)
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -267,6 +298,7 @@ class MediaViewerFragment :
             registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
                 override fun onPageSelected(position: Int) {
                     (activity as? MediaViewerActivity)?.setViewerBackgroundAlpha(1f)
+                    viewportStatus = null
                     // Do not start here. Fast flinging fires this for every page passed, and each
                     // one would briefly play sound. See spec 11 section 5.1.
                     stopPlaybackIfPageChanged()
@@ -276,25 +308,28 @@ class MediaViewerFragment :
                     if (!isEntering) {
                         hideTransitionImageWhenPageReady()
                     }
-                    // The grid flies the page we leave from back into its own tile, and it only
-                    // learns which one that is from our result. See plan 18 section 3.4 (1).
-                    requireActivity().setResult(
-                        Activity.RESULT_OK, Intent().apply { extraPath = currentPath }
-                    )
                     updatePlayerControlVisibility()
                     // The playback speed and details items only exist on video pages.
                     requireActivity().invalidateOptionsMenu()
                 }
 
                 override fun onPageScrollStateChanged(state: Int) {
+                    pagerScrollState = state
                     if (state == ViewPager2.SCROLL_STATE_IDLE) {
+                        publishCurrentViewportIfIdle()
                         startPlaybackIfVideoPage()
                     }
                 }
             })
             // The initial page never scrolls, so SCROLL_STATE_IDLE never arrives for it.
             // See plan 12 3.2.2.
-            doOnPreDraw { startPlaybackIfVideoPage() }
+            doOnPreDraw {
+                publishCurrentViewportIfIdle()
+                startPlaybackIfVideoPage()
+            }
+        }
+        (activity as? MediaViewerActivity)?.viewportSessionId?.let {
+            MediaViewerViewportCoordinator.registerViewer(it, viewportListener)
         }
         // The one place every way out passes through, see plan 18 section 3.6. Dragging down and
         // the system back button already come here; the toolbar arrow is sent here by
@@ -351,6 +386,17 @@ class MediaViewerFragment :
             logMediaTransition("viewer surface copy failed: $exception")
             complete(null)
         }
+    }
+
+    private fun publishCurrentViewportIfIdle() {
+        if (pagerScrollState != ViewPager2.SCROLL_STATE_IDLE || returnState != ReturnState.IDLE
+            || paths.isEmpty()) {
+            return
+        }
+        val path = currentPath
+        requireActivity().setResult(Activity.RESULT_OK, Intent().apply { extraPath = path })
+        val sessionId = (activity as? MediaViewerActivity)?.viewportSessionId ?: return
+        MediaViewerViewportCoordinator.request(sessionId, path)
     }
 
     /**
@@ -651,6 +697,10 @@ class MediaViewerFragment :
     }
 
     override fun onDestroyView() {
+        (activity as? MediaViewerActivity)?.viewportSessionId?.let {
+            MediaViewerViewportCoordinator.unregisterViewer(it, viewportListener)
+        }
+        viewportStatus = null
         if (returnState != ReturnState.RETURNING) {
             (activity as? MediaViewerActivity)?.setViewerBackgroundAlpha(1f)
         }
@@ -933,6 +983,7 @@ class MediaViewerFragment :
         binding.viewPager.doOnPreDraw {
             binding.viewPager.requestTransform()
             // The page that took the deleted one's place may be a video.
+            publishCurrentViewportIfIdle()
             startPlaybackIfVideoPage()
         }
     }
@@ -1020,7 +1071,7 @@ class MediaViewerFragment :
         get() = paths[binding.viewPager.currentItem]
 
     companion object {
-        private const val BACKGROUND_FULL_REVEAL_FRACTION = 0.25f
+        private const val BACKGROUND_FULL_REVEAL_FRACTION = 0.125f
         private const val BACKGROUND_ALPHA_AT_DRAG_START = 0.85f
 
         // Spec 11 section 6.3. 0.25 is there to slow fast motion down, e.g. a golf swing.

@@ -27,7 +27,7 @@ import me.zhanghai.android.files.util.layoutInflater
 import me.zhanghai.android.files.util.withTheme
 
 class BreadcrumbLayout : HorizontalScrollView {
-    private val tabLayoutHeight = context.getDimensionPixelSize(R.dimen.tab_layout_height)
+    private val pathBarHeight = context.getDimensionPixelSize(R.dimen.file_list_path_bar_height)
     // Using a color state list resource somehow results in red color in dark mode on API 21.
     // Run `git revert 5bb2fd1` once we no longer support API 21.
     private val itemColor =
@@ -138,7 +138,7 @@ class BreadcrumbLayout : HorizontalScrollView {
             } else {
                 Int.MAX_VALUE
             }
-            val height = tabLayoutHeight.coerceAtMost(maximumHeight)
+            val height = pathBarHeight.coerceAtMost(maximumHeight)
             MeasureSpec.makeMeasureSpec(height, MeasureSpec.EXACTLY)
         } else {
             heightMeasureSpec

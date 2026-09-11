@@ -31,6 +31,9 @@ class MediaViewerActivity : AppActivity() {
     val canRevealFileList: Boolean
         get() = intent.getBooleanExtra(EXTRA_CAN_REVEAL_FILE_LIST, false)
 
+    val viewportSessionId: String?
+        get() = intent.getStringExtra(EXTRA_VIEWPORT_SESSION_ID)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -106,6 +109,9 @@ class MediaViewerActivity : AppActivity() {
     override fun onDestroy() {
         viewerBackgroundAnimator?.cancel()
         viewerBackgroundAnimator = null
+        if (isFinishing) {
+            viewportSessionId?.let(MediaViewerViewportCoordinator::endSession)
+        }
         super.onDestroy()
     }
 
@@ -172,6 +178,8 @@ class MediaViewerActivity : AppActivity() {
         private val EXTRA_POSITION = "${MediaViewerActivity::class.java.name}.extra.POSITION"
         private val EXTRA_CAN_REVEAL_FILE_LIST =
             "${MediaViewerActivity::class.java.name}.extra.CAN_REVEAL_FILE_LIST"
+        private val EXTRA_VIEWPORT_SESSION_ID =
+            "${MediaViewerActivity::class.java.name}.extra.VIEWPORT_SESSION_ID"
         private const val BACKGROUND_RESTORE_DURATION_MILLIS = 200L
 
         fun putExtras(intent: Intent, paths: List<Path>, position: Int) {
@@ -180,8 +188,9 @@ class MediaViewerActivity : AppActivity() {
             intent.putExtra(EXTRA_POSITION, position)
         }
 
-        fun markOpenedFromFileList(intent: Intent) {
+        fun markOpenedFromFileList(intent: Intent, viewportSessionId: String) {
             intent.putExtra(EXTRA_CAN_REVEAL_FILE_LIST, true)
+            intent.putExtra(EXTRA_VIEWPORT_SESSION_ID, viewportSessionId)
         }
     }
 }

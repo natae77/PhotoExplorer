@@ -462,6 +462,7 @@ class FileListAdapter(
             transitionName = if (isMedia) mediaTransitionName(path) else null
             val shouldLoadThumbnail = supportsThumbnail && !shouldLoadThumbnailIcon
             isVisible = shouldLoadThumbnail
+            alpha = if (isMedia && listener.shouldHideMediaThumbnail(path)) 0f else 1f
             if (shouldLoadThumbnail) {
                 load(path to attributes) {
                     // ⚠️ The shared element transition snapshots this view by drawing it into a
@@ -798,6 +799,7 @@ class FileListAdapter(
     }
 
     interface Listener {
+        fun shouldHideMediaThumbnail(path: Path): Boolean
         fun clearSelectedFiles()
         fun selectFile(file: FileItem, selected: Boolean)
         fun selectFiles(files: FileItemSet, selected: Boolean)
