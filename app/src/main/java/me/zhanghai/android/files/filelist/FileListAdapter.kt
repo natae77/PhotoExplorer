@@ -364,6 +364,7 @@ class FileListAdapter(
     private fun bindFileViewHolder(holder: ViewHolder, file: FileItem, payloads: List<Any>) {
         val isMedia = viewType == FileViewType.MEDIA
         val isDirectory = file.attributes.isDirectory
+        holder.isDirectory = isDirectory
         val isEnabled = isFileSelectable(file) || isDirectory
         holder.itemLayout.isEnabled = isEnabled
         holder.menuButton.isEnabled = isEnabled
@@ -583,6 +584,11 @@ class FileListAdapter(
     override val isAnimationEnabled: Boolean
         get() = Settings.FILE_LIST_ANIMATION.valueCompat
 
+    fun isDirectoryChild(recyclerView: RecyclerView, child: View): Boolean {
+        val holder = recyclerView.getChildViewHolder(child) as? ViewHolder ?: return false
+        return holder.isDirectory
+    }
+
     companion object {
         private val PAYLOAD_STATE_CHANGED = Any()
 
@@ -621,6 +627,8 @@ class FileListAdapter(
         val checkImage: ImageView? = null,
         val menuScrimView: View? = null
     ) : RecyclerView.ViewHolder(root) {
+        var isDirectory = false
+
         constructor(binding: FileItemListBinding) : this(
             binding.root,
             binding.itemLayout,

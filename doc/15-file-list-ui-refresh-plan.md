@@ -9,7 +9,7 @@
 - 브랜치: `feature/file-list-ui-refresh`
 - 기준 커밋: `6c0d74f1`
 - 전제: 14번 기획서 2차 개정의 D1~D12가 확정된 상태
-- 상태: **구현 전**
+- 상태: **구현 완료, Pixel_8 에뮬레이터·SM-F971N 실기기 release 검증 완료**
 
 **표기**
 
@@ -43,13 +43,13 @@
 
 | 단계 | 만드는 것 | 화면에서 보이는 결과 | 기획서 | 상태 |
 |---|---|---|---|---|
-| 0 | 기준 상태 기록 | 변경 전 화면과 빌드 기준 확보 | §7, §8 | ⬜ |
-| 1 | 노란색 채움 폴더 | LIST·GRID·MEDIA의 폴더가 노란 채움 모양 | §3.4 | ⬜ |
-| 2 | 폴더 행 divider | LIST의 폴더 행 아래에만 1dp 선 | §3.1 | ⬜ |
-| 3 | 회색 경로 바와 시작 정렬 | 16dp 바깥 여백의 둥근 회색 바, 12dp 시작 | §3.2, §3.3 | ⬜ |
-| 4 | 즐겨찾기 바 표시 | 툴바와 경로 바 사이에 한 줄 칩 목록 | §3.5 위치·모양 | ⬜ |
-| 5 | 즐겨찾기 동작과 상태 | 이동·선택·편집·즉시 갱신·선택 해제 | §3.5 동작, §4.1 | ⬜ |
-| 6 | 통합 검증과 조정 | 테마·폴더블·접근성·회귀 확인 | §4~§8 | ⬜ |
+| 0 | 기준 상태 기록 | 변경 전 화면과 빌드 기준 확보 | §7, §8 | ✅ |
+| 1 | 노란색 채움 폴더 | LIST·GRID·MEDIA의 폴더가 노란 채움 모양 | §3.4 | ✅ |
+| 2 | 폴더 행 divider | LIST의 폴더 행 아래에만 1dp 선 | §3.1 | ✅ |
+| 3 | 회색 경로 바와 시작 정렬 | 16dp 바깥 여백의 둥근 회색 바, 12dp 시작 | §3.2, §3.3 | ✅ |
+| 4 | 즐겨찾기 바 표시 | 툴바와 경로 바 사이에 한 줄 칩 목록 | §3.5 위치·모양 | ✅ |
+| 5 | 즐겨찾기 동작과 상태 | 이동·선택·편집·즉시 갱신·선택 해제 | §3.5 동작, §4.1 | ✅ |
+| 6 | 통합 검증과 조정 | 테마·폴더블·접근성·회귀 확인 | §4~§8 | 🟨 에뮬레이터·실기기 기본 검증 완료, 접기·펼치기·TalkBack 별도 확인 필요 |
 
 ## 2. 파일 지도
 
@@ -588,6 +588,42 @@ JAVA_HOME="/c/Program Files/Android/Android Studio/jbr" ./gradlew lintDebug
 - [ ] 계획과 달라진 구현이 있으면 이유와 실제 방식을 별도 표로 남긴다.
 - [ ] 14번 §8의 실기기 결과를 기획서 또는 이 문서에 기록한다.
 - [ ] 다른 기계에서도 필요한 판단은 반드시 이 git 추적 문서에 남긴다.
+
+### 6.8 2026-09-11 구현·검증 결과
+
+| 항목 | 실제 결과 |
+|---|---|
+| 기준 | `feature/file-list-ui-refresh`, 작업 시작 HEAD `ee2e83e2`; 기존 워킹트리 변경 없음 |
+| 빌드 | `assembleDebug` 성공. 생성 APK를 API 36 Pixel_8 AVD에 설치하고 cold launch 성공. 서명 설정 없이 실행한 최초 `assembleRelease`는 R8·리소스 최적화까지 통과한 뒤 로컬 release `storeFile` 부재로 `packageRelease`에서 중단했으며, 이후 디버그 키를 지정한 release 빌드와 실기 검증은 아래 §6.9에서 완료 |
+| lint | `lintDebug` 실행 완료. 이번 변경 파일의 새 오류는 없으나 기존 `VideoDetails.kt`의 Media3 `UnsafeOptInUsageError` 4건(92~94, 111행) 때문에 전체 task는 실패 |
+| LIST | 밝음·어두움·검정 야간에서 노란 채움 폴더와 폴더 행 divider 확인. 폴더 우선을 끈 혼합 목록에서 파일→파일에는 선이 없고 폴더 행 아래에만 선이 남는 것 확인 |
+| GRID·MEDIA | 두 보기 모두 노란 폴더 썸네일 확인. MEDIA 날짜 타일과 미디어 썸네일에는 LIST divider가 생기지 않음 |
+| 경로 바 | 16dp 논리 바깥 여백, 48dp 높이, 둥근 배경, 12dp 텍스트 시작, 긴 breadcrumb 가로 스크롤 확인 |
+| 즐겨찾기 | `Screenshots` 칩 표시·48dp 터치 높이·탭 이동·현재 경로 checked 노출 확인. 현재 경로 칩을 다시 탭해도 펼친 검색이 유지되는 no-op 확인. 길게 누르면 편집 대화상자가 열리고 클릭 이동이 뒤따르지 않음 |
+| 오류 경로 | 존재하지 않는 기존 `Screenshots` 즐겨찾기로 이동했을 때 기존 `NoSuchFileException` 오류 화면을 표시하고 앱은 종료되지 않음 |
+| 테마 | M2/M3 각각 밝음·어두움·검정 야간의 6조합 확인. 밝은 바는 `#F1F3F4`, 두 야간 모드는 `#303134`; 검정 본문에서도 바가 구분됨 |
+| 테스트 후 상태 | AVD 설정을 M3 켬, 시스템 밝음, 검정 야간 끔, 폴더 우선 켬으로 복원 |
+
+Pixel_8 AVD에서는 실제 폴더블 동작과 실기기 제스처를 확인하지 않았다. 아래 §6.9에서 실기기
+기본 화면과 탭·길게 누르기·보기 전환을 추가로 검증했다. 실제 접기·펼치기, `sw600dp`
+persistent drawer, RTL, TalkBack 포커스 순서는 아직 확인하지 않았다. 0개/다수 즐겨찾기와
+편집·삭제·재정렬의 즉시 반영도 기존 데이터를 훼손하지 않기 위해 이번 수동 실행에서는
+변경하지 않았다. 해당 동작은 `SettingLiveData`를 `viewLifecycleOwner`로 직접 관찰하고 목록 변경
+시에만 칩을 다시 만드는 구현으로 연결되어 있다.
+
+### 6.9 2026-09-11 실기기 release 설치·검증 결과
+
+| 항목 | 실제 결과 |
+|---|---|
+| 빌드 | 표준 Android 디버그 키를 release 서명 설정으로 지정해 `assembleRelease` 성공. R8, `lintVitalRelease`, 리소스 최적화, `packageRelease`까지 완료. APK 크기 10,940,607 bytes |
+| 서명 | `apksigner verify --verbose --print-certs` 통과. v1·v2 서명 유효, 인증서 DN `C=US, O=Android, CN=Android Debug`, SHA-256 `a53f49a692d609f06c40875deeeb74a548fbb7d424242295d57f999a2c0f3585` |
+| 기기 | Samsung `SM-F971N`, Android API 37, 1248×1972, 420 dpi |
+| 설치·실행 | `adb install -r` 성공. `com.natae.photoexplorer/me.zhanghai.android.files.filelist.FileListActivity` cold launch 성공. 설치 버전 `1.7.4` (`versionCode=39`) |
+| LIST | 밝은 M3 테마에서 노란 채움 폴더 아이콘, 폴더 행 divider, 16dp 바깥 여백의 회색 둥근 경로 바 확인 |
+| 즐겨찾기 | 한 줄에 4개 칩 표시 확인. `Camera` 탭으로 이동하고 checked 상태 확인. 검색을 연 상태에서 현재 경로 칩을 다시 탭해 검색이 유지되는 no-op 확인. 길게 눌러 편집 대화상자가 열리는 것 확인 후 변경 없이 닫음 |
+| GRID·MEDIA | GRID의 2열 노란 폴더 타일과 MEDIA의 4열 폴더 타일 확인. 테스트 후 LIST와 기기 저장공간 루트로 복원 |
+| 안정성 | 테스트 구간 logcat에 `FATAL EXCEPTION`이나 앱 crash 없음. 확인된 오류 로그는 Samsung/Adreno의 비치명적 vendor 로그뿐 |
+| 정리 | 즐겨찾기 데이터는 변경하지 않았고, 기기에 만든 테스트용 스크린샷 2개 삭제 완료 |
 
 **커밋 메시지 초안:** `Verify file list UI refresh across layouts and themes`
 

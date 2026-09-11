@@ -77,6 +77,8 @@ import me.zhanghai.android.files.filelist.FileSortOptions.Order
 import me.zhanghai.android.files.fileproperties.FilePropertiesDialogFragment
 import me.zhanghai.android.files.navigation.BookmarkDirectories
 import me.zhanghai.android.files.navigation.BookmarkDirectory
+import me.zhanghai.android.files.navigation.EditBookmarkDirectoryDialogActivity
+import me.zhanghai.android.files.navigation.EditBookmarkDirectoryDialogFragment
 import me.zhanghai.android.files.navigation.NavigationFragment
 import me.zhanghai.android.files.navigation.NavigationRootMapLiveData
 import me.zhanghai.android.files.provider.archive.createArchiveRootPath
@@ -134,7 +136,8 @@ import me.zhanghai.android.files.viewer.media.MediaViewerActivity
 import me.zhanghai.android.files.viewer.media.isPlayableVideo
 import kotlin.math.roundToInt
 
-class FileListFragment : Fragment(), BreadcrumbLayout.Listener, FileListAdapter.Listener,
+class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayout.Listener,
+    FileListAdapter.Listener,
     ConfirmReplaceFileDialogFragment.Listener, OpenApkDialogFragment.Listener,
     ConfirmDeleteFilesDialogFragment.Listener, CreateArchiveDialogFragment.Listener,
     RenameFileDialogFragment.Listener, CreateFileDialogFragment.Listener,
@@ -244,6 +247,7 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, FileListAdapter.
         }
         binding.appBarLayout.syncBackgroundColorTo(binding.overlayToolbar)
         binding.breadcrumbLayout.setListener(this)
+        binding.bookmarkBarLayout.setListener(this)
         if (!(activity.hasSw600Dp && activity.isOrientationLandscape)) {
             binding.swipeRefreshLayout.setProgressViewEndTarget(
                 true, binding.swipeRefreshLayout.progressViewEndOffset
@@ -254,6 +258,9 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, FileListAdapter.
         binding.recyclerView.layoutManager = layoutManager
         adapter = FileListAdapter(this)
         binding.recyclerView.adapter = adapter
+        binding.recyclerView.addItemDecoration(
+            FileListDividerItemDecoration(requireContext(), adapter)
+        )
         val fastScroller = ThemedFastScroller.create(binding.recyclerView)
         binding.recyclerView.setOnApplyWindowInsetsListener(
             ScrollingViewOnApplyWindowInsetsListener(binding.recyclerView, fastScroller)
@@ -350,7 +357,13 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, FileListAdapter.
                 viewModel.pickOptions = pickOptions
             }
         }
-        viewModel.currentPathLiveData.observe(viewLifecycleOwner) { onCurrentPathChanged(it) }
+        viewModel.currentPathLiveData.observe(viewLifecycleOwner) {
+            onCurrentPathChanged(it)
+            binding.bookmarkBarLayout.setCurrentPath(it)
+        }
+        Settings.BOOKMARK_DIRECTORIES.observe(viewLifecycleOwner) {
+            binding.bookmarkBarLayout.setBookmarkDirectories(it)
+        }
         viewModel.searchViewExpandedLiveData.observe(viewLifecycleOwner) {
             onSearchViewExpandedChanged(it)
         }
@@ -872,8 +885,21 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, FileListAdapter.
 
     override fun navigateTo(path: Path) {
         collapseSearchView()
+        if (path != currentPath) {
+            viewModel.clearSelectedFiles()
+        }
         val state = layoutManager.onSaveInstanceState()
         viewModel.navigateTo(state!!, path)
+    }
+
+    override fun navigateTo(bookmarkDirectory: BookmarkDirectory) {
+        navigateTo(bookmarkDirectory.path)
+    }
+
+    override fun edit(bookmarkDirectory: BookmarkDirectory) {
+        val intent = EditBookmarkDirectoryDialogActivity::class.createIntent()
+            .putArgs(EditBookmarkDirectoryDialogFragment.Args(bookmarkDirectory))
+        startActivitySafe(intent)
     }
 
     override fun copyPath(path: Path) {
@@ -1797,6 +1823,7 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, FileListAdapter.
         val appBarLayout: CoordinatorAppBarLayout,
         val toolbar: Toolbar,
         val overlayToolbar: Toolbar,
+        val bookmarkBarLayout: BookmarkBarLayout,
         val breadcrumbLayout: BreadcrumbLayout,
         val contentLayout: ViewGroup,
         val progress: ProgressBar,
@@ -1826,7 +1853,8 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, FileListAdapter.
                     bindingRoot, includeBinding.drawerLayout, includeBinding.persistentDrawerLayout,
                     includeBinding.persistentBarLayout, appBarBinding.appBarLayout,
                     appBarBinding.toolbar, appBarBinding.overlayToolbar,
-                    appBarBinding.breadcrumbLayout, contentBinding.contentLayout,
+                    appBarBinding.bookmarkBarLayout, appBarBinding.breadcrumbLayout,
+                    contentBinding.contentLayout,
                     contentBinding.progress, contentBinding.errorText, contentBinding.emptyView,
                     contentBinding.swipeRefreshLayout, contentBinding.recyclerView,
                     bottomBarBinding.bottomBarLayout, bottomBarBinding.bottomToolbar,

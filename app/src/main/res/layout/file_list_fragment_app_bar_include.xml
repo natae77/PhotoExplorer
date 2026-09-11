@@ -47,11 +47,25 @@
                 app:popupTheme="?actionBarPopupTheme" />
         </FrameLayout>
 
-        <me.zhanghai.android.files.filelist.BreadcrumbLayout
-            android:id="@+id/breadcrumbLayout"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingStart="@dimen/content_start_margin_minus_12dp"
-            android:paddingEnd="@dimen/screen_edge_margin_minus_12dp" />
+            android:orientation="vertical">
+
+            <me.zhanghai.android.files.filelist.BookmarkBarLayout
+                android:id="@+id/bookmarkBarLayout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:visibility="gone" />
+
+            <me.zhanghai.android.files.filelist.BreadcrumbLayout
+                android:id="@+id/breadcrumbLayout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/file_list_path_bar_margin_horizontal"
+                android:layout_marginEnd="@dimen/file_list_path_bar_margin_horizontal"
+                android:background="@drawable/file_list_path_bar_background"
+                android:clipToOutline="true" />
+        </LinearLayout>
     </me.zhanghai.android.files.ui.CoordinatorAppBarLayout>
 </merge>

@@ -59,6 +59,12 @@
     <dimen name="file_list_toolbar_padding_end_no_overflow">14dp</dimen>
     <dimen name="file_list_toolbar_padding_end_with_overflow">10dp</dimen>
 
+    <dimen name="file_list_path_bar_margin_horizontal">16dp</dimen>
+    <dimen name="file_list_path_bar_corner_radius">24dp</dimen>
+    <dimen name="bookmark_bar_padding_horizontal">16dp</dimen>
+    <dimen name="bookmark_chip_spacing">8dp</dimen>
+    <dimen name="bookmark_chip_max_width">200dp</dimen>
+
     <!-- Reduce fast scroll thumb touch target size because we have the popup menu beside it. -->
     <dimen name="afs_min_touch_target_size">24dp</dimen>
 </resources>

@@ -14,9 +14,11 @@ import android.widget.LinearLayout
 import androidx.annotation.AttrRes
 import androidx.annotation.StyleRes
 import androidx.appcompat.widget.PopupMenu
+import androidx.core.graphics.ColorUtils
 import androidx.core.view.isVisible
 import java8.nio.file.Path
 import me.zhanghai.android.files.R
+import me.zhanghai.android.files.compat.getColorCompat
 import me.zhanghai.android.files.databinding.BreadcrumbItemBinding
 import me.zhanghai.android.files.util.getColorByAttr
 import me.zhanghai.android.files.util.getDimensionPixelSize
@@ -32,7 +34,7 @@ class BreadcrumbLayout : HorizontalScrollView {
         ColorStateList(
             arrayOf(intArrayOf(android.R.attr.state_activated), intArrayOf()),
             intArrayOf(
-                context.getColorByAttr(android.R.attr.textColorPrimary),
+                createAccessibleActivatedColor(),
                 context.getColorByAttr(android.R.attr.textColorSecondary)
             )
         )
@@ -72,6 +74,48 @@ class BreadcrumbLayout : HorizontalScrollView {
         itemsLayout.setPaddingRelative(paddingStart, paddingTop, paddingEnd, paddingBottom)
         setPaddingRelative(0, 0, 0, 0)
         addView(itemsLayout, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT))
+    }
+
+    private fun createAccessibleActivatedColor(): Int {
+        val primary = context.getColorByAttr(androidx.appcompat.R.attr.colorPrimary)
+        val background = context.getColorCompat(R.color.file_list_path_bar_background)
+        if (ColorUtils.calculateContrast(primary, background) >= MINIMUM_TEXT_CONTRAST) {
+            return primary
+        }
+        val blackCandidate = findMinimumContrastBlend(primary, android.graphics.Color.BLACK,
+            background)
+        val whiteCandidate = findMinimumContrastBlend(primary, android.graphics.Color.WHITE,
+            background)
+        val candidate = listOfNotNull(blackCandidate, whiteCandidate).minByOrNull { it.second }
+        if (candidate != null) {
+            return candidate.first
+        }
+        return if (
+            ColorUtils.calculateContrast(android.graphics.Color.BLACK, background) >=
+            ColorUtils.calculateContrast(android.graphics.Color.WHITE, background)
+        ) android.graphics.Color.BLACK else android.graphics.Color.WHITE
+    }
+
+    private fun findMinimumContrastBlend(
+        foreground: Int,
+        target: Int,
+        background: Int
+    ): Pair<Int, Float>? {
+        if (ColorUtils.calculateContrast(target, background) < MINIMUM_TEXT_CONTRAST) {
+            return null
+        }
+        var low = 0f
+        var high = 1f
+        repeat(20) {
+            val fraction = (low + high) / 2
+            val color = ColorUtils.blendARGB(foreground, target, fraction)
+            if (ColorUtils.calculateContrast(color, background) >= MINIMUM_TEXT_CONTRAST) {
+                high = fraction
+            } else {
+                low = fraction
+            }
+        }
+        return ColorUtils.blendARGB(foreground, target, high) to high
     }
 
     override fun jumpDrawablesToCurrentState() {
@@ -208,5 +252,9 @@ class BreadcrumbLayout : HorizontalScrollView {
         fun navigateTo(path: Path)
         fun copyPath(path: Path)
         fun openInNewTask(path: Path)
+    }
+
+    companion object {
+        private const val MINIMUM_TEXT_CONTRAST = 4.5
     }
 }
