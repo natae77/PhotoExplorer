@@ -7,12 +7,18 @@
 
 <vector
     xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="20dp"
-    android:height="20dp"
-    android:viewportWidth="20"
-    android:viewportHeight="20">
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
 
     <path
+        android:fillColor="@color/file_icon_yellow_back"
+        android:pathData="M2,5.25C2,4.56 2.56,4 3.25,4H9.4L11.2,6H20.75C21.44,6 22,6.56 22,7.25V9H2Z" />
+    <path
         android:fillColor="@color/file_icon_yellow"
-        android:pathData="M8,2H2C0.9,2 0,2.9 0,4v12c0,1.1 0.9,2 2,2h16c1.1,0 2,-0.9 2,-2V6C20,4.9 19.1,4 18,4h-8z" />
+        android:pathData="M2,7.5C2,6.67 2.67,6 3.5,6H20.5C21.33,6 22,6.67 22,7.5V18.25C22,19.22 21.22,20 20.25,20H3.75C2.78,20 2,19.22 2,18.25Z" />
+    <path
+        android:fillColor="@color/file_icon_yellow_highlight"
+        android:pathData="M4,8H20V9H4Z" />
 </vector>

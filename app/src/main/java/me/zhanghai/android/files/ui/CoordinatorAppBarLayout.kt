@@ -14,6 +14,9 @@ import android.util.AttributeSet
 import android.view.View
 import androidx.annotation.AttrRes
 import androidx.core.graphics.ColorUtils
+import androidx.core.graphics.drawable.toDrawable
+import com.google.android.material.elevation.ElevationOverlayProvider
+import com.google.android.material.color.MaterialColors
 import com.google.android.material.shape.MaterialShapeDrawable
 import me.zhanghai.android.files.util.activity
 
@@ -66,6 +69,22 @@ class CoordinatorAppBarLayout : FitsSystemWindowsAppBarLayout {
 
     fun syncBackgroundColorTo(view: View) {
         syncBackgroundColorViews += view
+    }
+
+    /** Keeps the lifted surface fill while preserving AppBarLayout's elevation/shadow changes. */
+    fun fixBackgroundToLiftedSurface(vararg syncedViews: View) {
+        val backgroundColor = (background as? MaterialShapeDrawable)?.fillColor?.defaultColor
+            ?: return
+        val liftedElevation = resources.getDimension(
+            com.google.android.material.R.dimen.design_appbar_elevation
+        )
+        val overlayColor = ElevationOverlayProvider(context)
+            .compositeOverlayIfNeeded(backgroundColor, liftedElevation)
+        val liftedColor = MaterialColors.getColor(
+            this, com.google.android.material.R.attr.colorSurfaceContainer, overlayColor
+        )
+        background = liftedColor.toDrawable()
+        syncedViews.forEach { it.background = liftedColor.toDrawable() }
     }
 
     private fun onBackgroundColorChanged(backgroundColor: Int) {

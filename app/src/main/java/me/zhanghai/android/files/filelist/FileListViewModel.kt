@@ -11,6 +11,7 @@ import androidx.lifecycle.MediatorLiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.map
+import androidx.lifecycle.viewModelScope
 import java8.nio.file.Path
 import me.zhanghai.android.files.file.FileItem
 import me.zhanghai.android.files.filelist.FileSortOptions.By
@@ -24,6 +25,53 @@ import java.io.Closeable
 
 // TODO: Use SavedStateHandle to save state.
 class FileListViewModel : ViewModel() {
+    private val directoryItemCountLoader = DirectoryItemCountLoader(viewModelScope)
+    val directoryItemCountUpdates: LiveData<DirectoryItemCountUpdate> =
+        directoryItemCountLoader.updates
+    private var lastDirectoryItemCountSuccessFiles: List<FileItem>? = null
+
+    fun getDirectoryItemCount(file: FileItem): DirectoryItemCountState =
+        directoryItemCountLoader.get(file.toDirectoryItemCountKey())
+
+    fun requestDirectoryItemCount(file: FileItem) {
+        directoryItemCountLoader.request(file.toDirectoryItemCountKey())
+    }
+
+    fun setDirectoryItemCountLoadingEnabled(enabled: Boolean) {
+        directoryItemCountLoader.setEnabled(enabled && viewTypeLiveData.value == FileViewType.LIST)
+    }
+
+    fun setDirectoryItemCountCandidates(files: List<FileItem>) {
+        directoryItemCountLoader.setCandidates(
+            files.asSequence()
+                .filter { it.attributes.isDirectory }
+                .mapTo(mutableSetOf()) { it.path }
+        )
+    }
+
+    fun beginDirectoryItemCountGeneration() {
+        lastDirectoryItemCountSuccessFiles = null
+        directoryItemCountLoader.advanceGeneration()
+    }
+
+    fun onDirectoryItemCountListSuccess(files: List<FileItem>) {
+        if (lastDirectoryItemCountSuccessFiles === files) {
+            return
+        }
+        lastDirectoryItemCountSuccessFiles = files
+        directoryItemCountLoader.invalidate(
+            files.asSequence()
+                .filter { it.attributes.isDirectory }
+                .mapTo(mutableSetOf()) { it.path },
+            true
+        )
+    }
+
+    fun invalidateDirectoryItemCounts(paths: Set<Path>, advanceGeneration: Boolean = true) {
+        lastDirectoryItemCountSuccessFiles = null
+        directoryItemCountLoader.invalidate(paths, advanceGeneration)
+    }
+
     private val trailLiveData = TrailLiveData()
     val hasTrail: Boolean
         get() = trailLiveData.value != null
@@ -224,6 +272,7 @@ class FileListViewModel : ViewModel() {
         }
 
     override fun onCleared() {
+        directoryItemCountLoader.clear()
         _fileListLiveData.close()
     }
 
@@ -274,3 +323,6 @@ class FileListViewModel : ViewModel() {
         }
     }
 }
+
+private fun FileItem.toDirectoryItemCountKey(): DirectoryItemCountKey =
+    DirectoryItemCountKey(path, attributes.lastModifiedTime().toMillis())

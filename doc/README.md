@@ -37,6 +37,8 @@ Windows 11에서 실제로 겪고 검증한 내용만 정리했다.
 | [13-viewer-performance.md](13-viewer-performance.md) | 뷰어가 느려지는 원인 조사와 수정 — 원본 해상도 비트맵, 스와이프 끊김, 계측 함정 |
 | [14-file-list-ui-refresh-spec.md](14-file-list-ui-refresh-spec.md) | 파일 목록 화면 정리 기획서 — 폴더 구분선, 회색 경로 바, 노란 폴더, 즐겨찾기 바로가기 |
 | [15-file-list-ui-refresh-plan.md](15-file-list-ui-refresh-plan.md) | 파일 목록 화면 정리 구현 계획 — 변경 파일, 0~6단계, 테마·폴더블·접근성 검증 |
+| [16-file-list-ui-refinement-spec.md](16-file-list-ui-refinement-spec.md) | 파일 목록 후속 개선 기획서 — 경로 간격, 폴더·선택 아이콘, LIST 보조 정보, 현재 폴더 제목 |
+| [17-file-list-ui-refinement-plan.md](17-file-list-ui-refinement-plan.md) | 파일 목록 후속 개선 구현 계획 — 상단 surface, 아이콘, 폴더 개수 비동기 cache, 단계별 검증 |
 | [media-view-mode-open-items.md](media-view-mode-open-items.md) | 09번 계획서의 미결 항목 — 누락·미결정·문서 모순 (착수 전 확인) |
 
 ## 핵심 요약 (급할 때 여기만)

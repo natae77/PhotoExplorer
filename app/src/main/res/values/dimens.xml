@@ -41,6 +41,7 @@
 
     <!-- Media view mode, see doc/08-media-view-mode-spec.md 4. -->
     <dimen name="media_item_width">112dp</dimen>
+    <dimen name="media_directory_icon_size">56dp</dimen>
     <!-- 24dp icon + 4dp outer + 20dp inner = 48dp touch target pinned to the corner. -->
     <dimen name="media_item_menu_padding_outer">4dp</dimen>
     <dimen name="media_item_menu_padding_inner">20dp</dimen>
@@ -60,6 +61,7 @@
     <dimen name="file_list_toolbar_padding_end_with_overflow">10dp</dimen>
 
     <dimen name="file_list_path_bar_margin_horizontal">16dp</dimen>
+    <dimen name="file_list_path_bar_margin_bottom">8dp</dimen>
     <dimen name="file_list_path_bar_corner_radius">24dp</dimen>
     <dimen name="bookmark_bar_padding_horizontal">16dp</dimen>
     <dimen name="bookmark_chip_spacing">8dp</dimen>

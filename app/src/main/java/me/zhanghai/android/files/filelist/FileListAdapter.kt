@@ -94,6 +94,13 @@ class FileListAdapter(
 
     private val filePositionMap = mutableMapOf<Path, Int>()
 
+    val directoryPaths: Set<Path>
+        get() = list.asSequence()
+            .filterIsInstance<FileListItem.File>()
+            .map { it.file }
+            .filter { it.attributes.isDirectory }
+            .mapTo(mutableSetOf()) { it.path }
+
     private lateinit var _nameEllipsize: TextUtils.TruncateAt
     var nameEllipsize: TextUtils.TruncateAt
         get() = _nameEllipsize
@@ -121,6 +128,25 @@ class FileListAdapter(
         for (file in changedFiles) {
             val position = filePositionMap[file.path]
             position?.let { notifyItemChanged(it, PAYLOAD_STATE_CHANGED) }
+        }
+    }
+
+    fun notifyDirectoryItemCountChanged(path: Path) {
+        val position = filePositionMap[path] ?: return
+        notifyItemChanged(position, PAYLOAD_DESCRIPTION_CHANGED)
+    }
+
+    fun refreshDirectoryDescriptions(requestIfNeeded: Boolean = false) {
+        // onStart() may run before the LiveData observer has delivered the initial view type.
+        if (this::_viewType.isInitialized && viewType == FileViewType.LIST && itemCount > 0) {
+            notifyItemRangeChanged(
+                0, itemCount,
+                if (requestIfNeeded) {
+                    PAYLOAD_DESCRIPTION_AND_REQUEST
+                } else {
+                    PAYLOAD_DESCRIPTION_CHANGED
+                }
+            )
         }
     }
 
@@ -364,35 +390,23 @@ class FileListAdapter(
     private fun bindFileViewHolder(holder: ViewHolder, file: FileItem, payloads: List<Any>) {
         val isMedia = viewType == FileViewType.MEDIA
         val isDirectory = file.attributes.isDirectory
-        holder.isDirectory = isDirectory
-        val isEnabled = isFileSelectable(file) || isDirectory
-        holder.itemLayout.isEnabled = isEnabled
-        holder.menuButton.isEnabled = isEnabled
-        val menu = holder.popupMenu.menu
-        val path = file.path
-        val hasPickOptions = pickOptions != null
-        val isReadOnly = path.fileSystem.isReadOnly
-        menu.findItem(R.id.action_cut).isVisible = !hasPickOptions && !isReadOnly
-        menu.findItem(R.id.action_copy).isVisible = !hasPickOptions
-        val checked = file in selectedFiles
-        holder.itemLayout.isChecked = checked
-        if (isMedia) {
-            // Media tiles have no icon area to put the check badge in, so the menu button and the
-            // check mark share the same corner. See spec 4.1.
-            holder.checkImage?.isVisible = checked
-            holder.menuButton.isVisible = !checked
-            holder.menuScrimView?.isVisible = !checked
+        val isKnownPartialBind = payloads.isNotEmpty() && payloads.all {
+            it === PAYLOAD_STATE_CHANGED || it === PAYLOAD_DESCRIPTION_CHANGED
+                || it === PAYLOAD_DESCRIPTION_AND_REQUEST
         }
-        holder.nameText.apply {
-            if (isSingleLineCompat) {
-                val nameEllipsize = nameEllipsize
-                ellipsize = nameEllipsize
-                isSelected = nameEllipsize == TextUtils.TruncateAt.MARQUEE
+        if (!isKnownPartialBind || payloads.any { it === PAYLOAD_STATE_CHANGED }) {
+            bindFileState(holder, file, isMedia, isDirectory)
+        }
+        if (isKnownPartialBind) {
+            val requestDescription = payloads.any { it === PAYLOAD_DESCRIPTION_AND_REQUEST }
+            if (requestDescription || payloads.any { it === PAYLOAD_DESCRIPTION_CHANGED }) {
+                bindFileDescription(holder, file, requestDescription)
             }
-        }
-        if (payloads.isNotEmpty()) {
             return
         }
+        val menu = holder.popupMenu.menu
+        val path = file.path
+        val isReadOnly = path.fileSystem.isReadOnly
         bindViewHolderAnimation(holder)
         holder.itemLayout.apply {
             setOnClickListener {
@@ -487,16 +501,10 @@ class FileListAdapter(
         } else {
             holder.nameText.text = file.name
         }
-        holder.descriptionText?.text = if (isDirectory) {
-            null
-        } else {
-            val context = holder.descriptionText!!.context
-            val lastModificationTime = attributes.lastModifiedTime().toInstant()
-                .formatShort(context)
-            val size = attributes.fileSize.formatHumanReadable(context)
-            val descriptionSeparator = context.getString(R.string.file_item_description_separator)
-            listOf(lastModificationTime, size).joinToString(descriptionSeparator)
-        }
+        holder.menuButton.contentDescription = holder.menuButton.context.getString(
+            R.string.file_item_more_options, file.name
+        )
+        bindFileDescription(holder, file, true)
         val isArchivePath = path.isArchivePath
         menu.findItem(R.id.action_copy)
             .setTitle(if (isArchivePath) R.string.file_item_action_extract else R.string.copy)
@@ -560,6 +568,74 @@ class FileListAdapter(
         }
     }
 
+    private fun bindFileState(
+        holder: ViewHolder,
+        file: FileItem,
+        isMedia: Boolean,
+        isDirectory: Boolean
+    ) {
+        holder.isDirectory = isDirectory
+        val isEnabled = isFileSelectable(file) || isDirectory
+        holder.itemLayout.isEnabled = isEnabled
+        holder.menuButton.isEnabled = isEnabled
+        val menu = holder.popupMenu.menu
+        val hasPickOptions = pickOptions != null
+        val isReadOnly = file.path.fileSystem.isReadOnly
+        menu.findItem(R.id.action_cut).isVisible = !hasPickOptions && !isReadOnly
+        menu.findItem(R.id.action_copy).isVisible = !hasPickOptions
+        val checked = file in selectedFiles
+        holder.itemLayout.isChecked = checked
+        if (isMedia) {
+            // Media tiles have no icon area to put the check badge in, so the menu button and the
+            // check mark share the same corner. See spec 4.1.
+            holder.checkImage?.isVisible = checked
+            holder.menuButton.isVisible = !checked
+            holder.menuScrimView?.isVisible = !checked
+        }
+        holder.nameText.apply {
+            if (isSingleLineCompat) {
+                val nameEllipsize = nameEllipsize
+                ellipsize = nameEllipsize
+                isSelected = nameEllipsize == TextUtils.TruncateAt.MARQUEE
+            }
+        }
+    }
+
+    private fun bindFileDescription(holder: ViewHolder, file: FileItem, requestIfNeeded: Boolean) {
+        val descriptionText = holder.descriptionText ?: return
+        val context = descriptionText.context
+        val isSymbolicLink = file.attributesNoFollowLinks.isSymbolicLink
+        val isBrokenSymbolicLink = isSymbolicLink && file.isSymbolicLinkBroken
+        val attributes = if (isBrokenSymbolicLink) {
+            file.attributesNoFollowLinks
+        } else {
+            file.attributes
+        }
+        val lastModificationTime = attributes.lastModifiedTime().toInstant().formatShort(context)
+        val detail = when {
+            isBrokenSymbolicLink -> null
+            attributes.isDirectory -> when (val state = listener.getDirectoryItemCount(file)) {
+                is DirectoryItemCountState.Available -> context.resources.getQuantityString(
+                    R.plurals.file_item_directory_count, state.count, state.count
+                )
+                DirectoryItemCountState.Loading,
+                DirectoryItemCountState.NotRequested,
+                DirectoryItemCountState.Unavailable -> null
+            }
+            else -> attributes.fileSize.formatHumanReadable(context)
+        }
+        descriptionText.text = if (detail == null) {
+            lastModificationTime
+        } else {
+            lastModificationTime + context.getString(R.string.file_item_description_separator) +
+                detail
+        }
+        if (requestIfNeeded && attributes.isDirectory
+            && listener.getDirectoryItemCount(file) is DirectoryItemCountState.NotRequested) {
+            listener.requestDirectoryItemCount(file)
+        }
+    }
+
     override fun getPopupText(view: View, position: Int): CharSequence {
         val locale = Locale.getDefault()
         // Not a feature, just a value that has to exist so that fast scroll does not crash on a
@@ -591,6 +667,8 @@ class FileListAdapter(
 
     companion object {
         private val PAYLOAD_STATE_CHANGED = Any()
+        private val PAYLOAD_DESCRIPTION_CHANGED = Any()
+        private val PAYLOAD_DESCRIPTION_AND_REQUEST = Any()
 
         private val VIEW_TYPE_DATE = FileViewType.entries.size
 
@@ -717,5 +795,7 @@ class FileListAdapter(
         fun addBookmark(file: FileItem)
         fun createShortcut(file: FileItem)
         fun showPropertiesDialog(file: FileItem)
+        fun getDirectoryItemCount(file: FileItem): DirectoryItemCountState
+        fun requestDirectoryItemCount(file: FileItem)
     }
 }

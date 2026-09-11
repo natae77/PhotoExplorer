@@ -287,7 +287,11 @@
     <string name="file_list_action_create_file">파일</string>
     <string name="file_list_action_create_directory">폴더</string>
 
-    <string name="file_item_description_separator">\u0020\u0020\u0020\u0020</string>
+    <string name="file_item_description_separator">\u0020·\u0020</string>
+    <string name="file_item_more_options">%1$s 옵션 더보기</string>
+    <plurals name="file_item_directory_count">
+        <item quantity="other">%1$,d개</item>
+    </plurals>
     <string name="file_item_action_open_with">연결 프로그램</string>
     <string name="file_item_action_extract">압축 풀기</string>
     <string name="file_item_action_archive">압축</string>

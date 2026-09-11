@@ -194,6 +194,9 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
 
     private lateinit var adapter: FileListAdapter
 
+    private var isViewStarted = false
+    private var directoryItemCountSearchState: SearchState? = null
+
     private val debouncedSearchRunnable = DebouncedRunnable(Handler(Looper.getMainLooper()), 1000) {
         if (!isResumed || !viewModel.isSearchViewExpanded) {
             return@DebouncedRunnable
@@ -245,7 +248,7 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
                     binding.appBarLayout.totalScrollRange + verticalOffset
             )
         }
-        binding.appBarLayout.syncBackgroundColorTo(binding.overlayToolbar)
+        binding.appBarLayout.fixBackgroundToLiftedSurface(binding.overlayToolbar)
         binding.breadcrumbLayout.setListener(this)
         binding.bookmarkBarLayout.setListener(this)
         if (!(activity.hasSw600Dp && activity.isOrientationLandscape)) {
@@ -369,6 +372,7 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
         }
         viewModel.breadcrumbLiveData.observe(viewLifecycleOwner) {
             binding.breadcrumbLayout.setData(it)
+            updateToolbarTitle()
         }
         viewModel.viewTypeLiveData.observe(viewLifecycleOwner) { onViewTypeChanged(it) }
         // Live data only calls observeForever() on its sources when it is active, so we have to
@@ -385,9 +389,35 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
         viewModel.pasteStateLiveData.observe(viewLifecycleOwner) { onPasteStateChanged(it) }
         Settings.FILE_NAME_ELLIPSIZE.observe(viewLifecycleOwner) { onFileNameEllipsizeChanged(it) }
         viewModel.fileListLiveData.observe(viewLifecycleOwner) { onFileListChanged(it) }
+        viewModel.directoryItemCountUpdates.observe(viewLifecycleOwner) {
+            adapter.notifyDirectoryItemCountChanged(it.path)
+        }
+        viewModel.searchStateLiveData.observe(viewLifecycleOwner) {
+            val oldState = directoryItemCountSearchState
+            directoryItemCountSearchState = it
+            if (oldState != null && oldState != it) {
+                viewModel.beginDirectoryItemCountGeneration()
+                viewModel.setDirectoryItemCountCandidates(emptyList())
+            }
+        }
         Settings.FILE_LIST_SHOW_HIDDEN_FILES.observe(viewLifecycleOwner) {
             onShowHiddenFilesChanged(it)
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+
+        isViewStarted = true
+        viewModel.setDirectoryItemCountLoadingEnabled(true)
+        adapter.refreshDirectoryDescriptions(true)
+    }
+
+    override fun onStop() {
+        isViewStarted = false
+        viewModel.setDirectoryItemCountLoadingEnabled(false)
+
+        super.onStop()
     }
 
     override fun onResume() {
@@ -604,6 +634,8 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
     private fun onCurrentPathChanged(path: Path) {
         hasScrolledToLatest = false
         loadedPath = null
+        viewModel.beginDirectoryItemCountGeneration()
+        viewModel.setDirectoryItemCountCandidates(emptyList())
         updateOverlayToolbar()
         updateBottomToolbar()
     }
@@ -615,6 +647,9 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
     private fun onFileListChanged(stateful: Stateful<List<FileItem>>) {
         val files = stateful.value
         val isSearching = viewModel.searchState.isSearching
+        if (stateful is Success && !isSearching) {
+            viewModel.onDirectoryItemCountListSuccess(stateful.value)
+        }
         when {
             stateful is Failure -> binding.toolbar.setSubtitle(R.string.error)
             stateful is Loading && !isSearching -> binding.toolbar.setSubtitle(R.string.loading)
@@ -719,6 +754,7 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
     private fun onViewTypeChanged(viewType: FileViewType) {
         updateSpanCount()
         adapter.viewType = viewType
+        viewModel.setDirectoryItemCountLoadingEnabled(isViewStarted)
         // The set of displayed files depends on the view type in media mode.
         updateAdapterFileList()
         updateViewSortMenuItems()
@@ -810,6 +846,7 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
     }
 
     private fun refresh() {
+        viewModel.invalidateDirectoryItemCounts(adapter.directoryPaths)
         viewModel.reload()
     }
 
@@ -837,6 +874,7 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
             }
         }
         adapter.replaceListAndIsSearching(files, viewModel.searchState.isSearching)
+        viewModel.setDirectoryItemCountCandidates(files)
         updateEmptyView()
     }
 
@@ -913,9 +951,16 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
     }
 
     private fun onPickOptionsChanged(pickOptions: PickOptions?) {
-        val title = if (pickOptions == null) {
-            getString(R.string.file_list_title)
-        } else {
+        updateToolbarTitle()
+        updateSelectAllMenuItem()
+        updateOverlayToolbar()
+        updateBottomToolbar()
+        adapter.pickOptions = pickOptions
+    }
+
+    private fun updateToolbarTitle() {
+        val pickOptions = viewModel.pickOptionsLiveData.value
+        val title = if (pickOptions != null) {
             val count = if (pickOptions.allowMultiple) Int.MAX_VALUE else 1
             when (pickOptions.mode) {
                 PickOptions.Mode.OPEN_FILE ->
@@ -924,12 +969,23 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
                 PickOptions.Mode.OPEN_DIRECTORY ->
                     getQuantityString(R.plurals.file_list_title_open_directory, count)
             }
+        } else {
+            val breadcrumb = viewModel.breadcrumbLiveData.value
+            val index = breadcrumb?.selectedIndex ?: -1
+            val name = if (breadcrumb != null && index in breadcrumb.paths.indices
+                && index in breadcrumb.nameProducers.indices) {
+                try {
+                    breadcrumb.nameProducers[index](requireContext())
+                } catch (exception: Exception) {
+                    exception.printStackTrace()
+                    null
+                }
+            } else {
+                null
+            }
+            name?.takeIf { it.isNotBlank() } ?: getString(R.string.file_list_title)
         }
         requireActivity().title = title
-        updateSelectAllMenuItem()
-        updateOverlayToolbar()
-        updateBottomToolbar()
-        adapter.pickOptions = pickOptions
     }
 
     private fun updateSelectAllMenuItem() {
@@ -1011,7 +1067,7 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
                     if (areAllFilesArchivePaths) {
                         R.drawable.extract_icon_control_normal_24dp
                     } else {
-                        R.drawable.copy_icon_control_normal_24dp
+                        R.drawable.file_list_select_copy_icon_24dp
                     }
                 )
                 .setTitle(
@@ -1327,6 +1383,13 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
 
     override fun selectFiles(files: FileItemSet, selected: Boolean) {
         viewModel.selectFiles(files, selected)
+    }
+
+    override fun getDirectoryItemCount(file: FileItem): DirectoryItemCountState =
+        viewModel.getDirectoryItemCount(file)
+
+    override fun requestDirectoryItemCount(file: FileItem) {
+        viewModel.requestDirectoryItemCount(file)
     }
 
     override fun openFile(file: FileItem) {

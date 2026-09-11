@@ -46,6 +46,8 @@
     <color name="file_icon_red">#EA4335</color>
     <color name="file_icon_deep_red">#DB4437</color>
     <color name="file_icon_yellow">#F4B400</color>
+    <color name="file_icon_yellow_back">#FBCB43</color>
+    <color name="file_icon_yellow_highlight">#80FFF3C4</color>
 
     <color name="file_list_path_bar_background">#F1F3F4</color>
 
