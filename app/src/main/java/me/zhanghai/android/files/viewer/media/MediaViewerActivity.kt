@@ -40,13 +40,13 @@ class MediaViewerActivity : AppActivity() {
         // listener in its constructor, and it is built right after onCreate() - by the time
         // Fragment.onActivityCreated() runs (FragmentActivity dispatches it from onStart()) the
         // coordinator already exists and would never see it. The view is found late instead, from
-        // inside the callback, which is only called after the first pre-draw. See plan 14 3.2.2.
+        // inside the callback, which is only called after the first pre-draw. See plan 18 3.2.2.
         ActivityCompat.setEnterSharedElementCallback(this, sharedElementCallback)
         // ⚠️ SharedElementCallback.onSharedElementEnd() is NOT the end of the transition - the
         // framework calls it before the animation runs, once the end state has been laid out, so
         // that a listener can measure it. Revealing the pager there uncovers the picture at its
         // final size while the tile is still on its way, which is the double image all over again.
-        // Plan 14 section 3.3 names the wrong hook; this is the one that means "finished".
+        // Plan 18 section 3.3 names the wrong hook; this is the one that means "finished".
         //
         // PhoneWindow inflates this transition per window, so the listener cannot outlive us.
         window.sharedElementEnterTransition?.addListener(object : TransitionListenerAdapter() {
@@ -59,7 +59,7 @@ class MediaViewerActivity : AppActivity() {
     }
 
     /**
-     * The way out through the toolbar arrow, see plan 14 D17.
+     * The way out through the toolbar arrow, see plan 18 D17.
      *
      * AppActivity.onSupportNavigateUp() calls finish(), which does not run a return transition at
      * all. Everything has to leave through the one hook in the fragment instead.
@@ -78,7 +78,7 @@ class MediaViewerActivity : AppActivity() {
             val transitionImage = fragment.transitionImageOrNull ?: return
             // ⚠️ Only on the way out. Coming in, onMapSharedElements() runs long before
             // onSharedElementStart() has anything to put in the image, so an unguarded check here
-            // would open the viewer with no shared element at all. See plan 14 3.2.1 and D20.
+            // would open the viewer with no shared element at all. See plan 18 3.2.1 and D20.
             if (fragment.isReturning && transitionImage.drawable == null) {
                 // Nothing to send - do not fly an empty rectangle into the tile (F4, F5).
                 logMediaTransition("viewer map: returning, no drawable -> blocked")

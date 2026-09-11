@@ -28,7 +28,7 @@
         app:pause_icon="@drawable/exo_icon_pause" />
 
     <!--
-      ~ The one view that flies between the grid tile and the viewer, see plan 14 section 3.1.
+      ~ The one view that flies between the grid tile and the viewer, see plan 18 section 3.1.
       ~
       ~ It is an ImageView so that ChangeImageTransform can carry the tile's centerCrop over to
       ~ fitCenter - SubsamplingScaleImageView and PlayerView are not ImageViews and would arrive

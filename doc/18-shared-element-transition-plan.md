@@ -1,17 +1,18 @@
-# 14. 그리드 ↔ 뷰어 공유 요소 전환 구현 계획
+# 18. 그리드 ↔ 뷰어 공유 요소 전환 구현 계획
 
 미디어 모드에서 사진을 열면 **타일이 커지면서 뷰어가 되고**, 뷰어를 닫으면
 **미디어가 원래 타일 자리로 줄어들며 들어간다.** 지금의 좌우 슬라이드를 대체한다.
 
-- 작성일: 2026-09-04 / 최종 개정: **2026-09-04 (5차)**
+- 작성일: 2026-09-04 / 최종 개정: **2026-09-11 (6차)**
 - 프로젝트: **PhotoExplorer** (`natae77/PhotoExplorer`, `zhanghai/MaterialFiles` fork)
 - 기준 소스: `feature/media-view-mode` (`8c3e67d2` 시점)
-- 상태: **구현 완료 — 에뮬레이터에서 넓게, 실기기 릴리스(R8) 빌드에서 좁게 검증** (§5.4에 무엇을 확인했고 무엇을 못 했는지 적었다)
+- 상태: **구현 완료 — 파일 목록 UI 통합 빌드를 에뮬레이터에서 검증, 실기기 통합 재검증 남음** (§5.4·§5.5)
 
 **개정 이력** — 이 문서는 개정할 때 새 문서를 만들지 않고 **본문을 직접 고친다.**
 
 | 개정 | 날짜 | 무엇이 바뀌었나 |
 |---|---|---|
+| 6차 | 2026-09-11 | 문서 번호를 14 → **18**로 바로잡았다. 파일 목록 UI와 통합하면서 동영상 출력이 `TextureView`에서 HDR용 `SurfaceView`로 바뀐 것을 반영해, 현재 프레임 획득을 **`PixelCopy` 비동기 복사**로 수정했다(§3.5·§3.6, D26). 별도 통합 검증 문서의 결과와 미검증 범위를 §5.5에 합쳤다 |
 | 5차 | 2026-09-04 | **구현하면서 실기(에뮬레이터)에서 드러난 것들.** ⚠️ **§3.3이 지목한 전환 종료 훅이 틀렸다 — `onSharedElementEnd` 는 전환이 끝날 때가 아니라 시작하기 전에 불린다**(§3.3, D22). 진입에도 §3.6 (1)과 같은 **같은 그림 둘** 문제가 있다는 것을 빠뜨렸다(§3.3, D23). **Coil 이 하드웨어 비트맵을 주면 프레임워크 스냅샷이 앱을 죽인다**(§3.5, D24). 폴백에서 페이지를 감추면 안 된다는 것(§3.7 F1·F2, D25) |
 | 4차 | 2026-09-04 | 3차 소스 대조 리뷰 반영. **폴백 가드가 진입에서 먼저 걸려 열기 전환을 죽이던 것**을 방향 구분으로 고쳤다(§3.2, D20). **enter 콜백 등록 자리가 한 박자 늦어** 진입에만 안 걸리던 것을 액티비티 `onCreate` 로 옮겼다(§3.2, D19 정정). 자리를 못 박지 않았던 셋 — 전환 종료 훅, 로딩 완료 신호, exit 콜백 등록 자리 — 을 정했다(§3.3·§3.5·§3.4) |
 | 3차 | 2026-09-04 | **§0 표와 D11이 틀렸다 — 툴바 화살표는 `finish()` 로 가서 복귀 전환을 돌지 않는다**(D17). "종료 직전" 훅이 코드에 없어 자리를 만들었다(§3.6). F4·F5 폴백이 **빈 사각형을 날려 보내던 것**을 뷰어 쪽 차단으로 고쳤다(D18). 스냅샷을 `background` 로도 읽는다(§3.5) |
@@ -378,7 +379,7 @@ recyclerView.doOnPreDraw { requireActivity().supportStartPostponedEnterTransitio
 |---|---|---|
 | `PhotoView` 가 보임 | `image.drawable != null` | `image.drawable` — 원본이라 여백이 없다 |
 | `SSIV` 가 보임 | `largeImage.isReady` | `largeImage.drawToBitmap()` 을 **`sourceToViewRect` 로 잘라서** ⚠️ |
-| 동영상, 첫 프레임 이후 | 렌더링됨 | `PlayerView` 의 `TextureView.getBitmap()` — 이미 비율대로 잘려 있다 |
+| 동영상, 첫 프레임 이후 | 현재 경로의 첫 프레임 렌더링 이벤트를 받음 | `PlayerView`의 `SurfaceView`를 `PixelCopy`로 비동기 복사 — 이미 영상 영역 크기다 |
 | 동영상, 재생 전 | `thumbnailImage.drawable != null` | `thumbnailImage.drawable` |
 | 진행 표시·오류 | `LOADING` / `ERROR` | 없음 → 폴백 (§3.7 F5) |
 
@@ -390,10 +391,12 @@ recyclerView.doOnPreDraw { requireActivity().supportStartPostponedEnterTransitio
 ⚠️ **`SSIV` 한 갈래만의 함정 — 레터박스가 같이 뜬다.** 전체 화면을 그대로 뜨면 검은 여백이
 포함되고, 복귀가 끝나는 지점에서 프레임워크가 타일의 `centerCrop` 을 적용하므로
 **타일이 실제 보여 주는 썸네일과 어긋난다.** 가로 사진일수록 마지막에 눈에 띄게 튄다.
-`PhotoView` 는 원본 `drawable` 이고 `TextureView` 는 이미 비율대로 잘려 있어 둘 다 이 문제가 없다.
+`PhotoView` 는 원본 `drawable` 이고 `SurfaceView`에서 복사한 프레임은 영상 영역 크기라
+둘 다 이 문제가 없다.
 
-⚠️ **`TextureView` 는 `drawToBitmap()` 으로 안 나온다.** 하드웨어 레이어라 소프트웨어 캔버스에는
-빈 화면이 그려진다. `getBitmap()` 을 따로 써야 한다.
+⚠️ **`SurfaceView` 는 일반 View 캡처로 나오지 않는다.** 영상은 앱의 View 계층과 별도 Surface에
+그려지므로 `drawToBitmap()`도 쓸 수 없고, `TextureView.bitmap`도 존재하지 않는다.
+Android 7.0(API 24) 이상에서 `PixelCopy.request(surface, bitmap, ...)`로 복사해야 한다(§3.5.2).
 
 **열 때는 프레임워크가 주는 스냅샷을 쓴다.**
 `onSharedElementStart` 의 세 번째 인자 `sharedElementSnapshots` 는 떠나온 액티비티의
@@ -447,21 +450,42 @@ java.lang.IllegalArgumentException: Software rendering doesn't support hardware 
 `drawable as? BitmapDrawable` 은 영원히 실패하고, `CrossfadeDrawable` 안의 비트맵을 파고드는
 것은 Coil 내부 구현에 기대는 짓이다. **디코드 시점에 막는 것이 유일하게 튼튼하다.**
 
-`SSIV`(우리가 `drawToBitmap` 한 것)와 동영상 현재 프레임(`TextureView.getBitmap()`)은 이미
-소프트웨어라 문제가 없다. `returnDrawable()` 에 하드웨어→소프트웨어 복사 가드를 하나 더 두지만,
+`SSIV`(우리가 `drawToBitmap` 한 것)와 동영상 현재 프레임(`PixelCopy` 대상 `ARGB_8888` 비트맵)은
+이미 소프트웨어라 문제가 없다. `returnDrawable()` 에 하드웨어→소프트웨어 복사 가드를 하나 더 두지만,
 그것은 위 두 곳이 뚫렸을 때를 위한 이중 안전장치일 뿐 **그것만으로는 못 막는다.**
+
+#### 3.5.2 `SurfaceView`의 현재 프레임은 비동기로 복사한다 (6차)
+
+12번의 HDR 밝기 개선으로 동영상 출력이 `TextureView`에서 `SurfaceView`로 바뀌었다.
+공유 요소 전환은 동기적으로 그림을 준비하던 설계였으므로, 그대로 두면 재생 중인 동영상은
+`currentPageContent()`에서 그림을 얻지 못해 `RESULT_CANCELED` 폴백으로만 닫힌다.
+
+종료 요청이 들어오면 현재 페이지가 **실제로 첫 프레임까지 렌더링된 동영상**인지 확인한 뒤:
+
+1. 플레이어를 일시 정지해 복사할 프레임을 고정한다.
+2. `SurfaceView` 크기의 `ARGB_8888` 비트맵을 만든다.
+3. `PixelCopy.request()`로 프레임을 복사한다.
+4. 성공하면 그 비트맵을 `transitionImage`에 넣고, 실패하면 그림 없이 일반 종료로 폴백한다.
+
+`PixelCopy`는 비동기이므로 종료를 기다리는 동안 중복 뒤로가기 요청을 막는다. **500ms 시간 제한**을
+두고, API 24 미만·유효하지 않은 Surface·크기 0·경로 변경·뷰 생명주기 종료·복사 예외는 모두
+조용히 폴백한다. 콜백이 늦게 돌아왔을 때 다른 페이지의 프레임을 싣지 않도록 요청 당시의
+뷰와 경로를 다시 비교한다(D26).
 
 ### 3.6 종료 훅 — 닫는 경로 셋을 한 자리로 모은다
 
 §3.2.1의 `isReturning`, §3.4 (1), §3.5의 그림, 아래 (1)·(2)가 모두 "종료 직전"에 일어나야 하는데,
 **지금 코드에는 그런 자리가 없다.** `MediaViewerFragment` 가 `OnBackPressedCallback` 을 걸고
-그 안에서 한 프레임에 처리한다.
+처리한다. 사진과 재생 전 동영상은 한 프레임에 끝나고, 재생 중 `SurfaceView` 동영상만
+§3.5.2의 비동기 복사를 먼저 기다린다.
 
 ```kotlin
 // MediaViewerFragment.onActivityCreated
 activity.onBackPressedDispatcher.addCallback(viewLifecycleOwner) {
+    if (isPreparingReturn || isReturning) return
+    // 0. 렌더링된 SurfaceView 동영상이면 PixelCopy를 요청하고 성공/실패 콜백에서 아래를 계속한다 (§3.5.2)
     isReturning = true                       // §3.2.1 — 이제부터 가드가 산다
-    // 1. currentPageContent() 로 그림을 얻어 transitionImage 에 넣는다 (§3.5)
+    // 1. currentPageContent() 또는 PixelCopy 결과를 transitionImage 에 넣는다 (§3.5)
     //    없으면 채우지 않는다 → §3.2.1 가드가 전환을 끊는다 (F4·F5)
     // 2. 아래로 끌던 변형을 옮겨 받는다 (아래 (2))
     // 3. viewPager · appBarLayout · playerControlView 를 감춘다 (아래 (1))
@@ -475,6 +499,8 @@ activity.onBackPressedDispatcher.addCallback(viewLifecycleOwner) {
   `onSupportNavigateUp()` 을 재정의해 `onBackPressedDispatcher.onBackPressed()` 로 보낸다(D17).
 - 콜백 안에서 `finishAfterTransition()` 을 **직접 부른다.** 콜백이 뒤로가기를 소비하므로
   기본 처리(= `Activity.onBackPressed()` 의 `finishAfterTransition()`)가 돌지 않는다.
+- `SurfaceView` 동영상은 `finishAfterTransition()`을 `PixelCopy` 성공·실패 또는 500ms 시간 제한
+  뒤에 부른다. 기다리는 동안 `isPreparingReturn`으로 중복 종료를 막는다.
 - ⚠️ **항상 켜진 콜백은 Android 13+ 예측형 뒤로가기 애니메이션을 끈다.** 지금도 쓰고 있지
   않으므로 회귀는 아니다(§1 비목표).
 
@@ -623,6 +649,8 @@ ANDROID_HOME="C:\Users\hskang\AppData\Local\Android\Sdk" JAVA_HOME="/c/Program F
 
 ### 9단계 — 닫을 때 그림 채우기 ← *여기까지로 "닫기"가 완성된다*
 - 종료 훅에서 `isReturning = true`, `currentPageContent()` 의 그림을 `transitionImage` 에 (§3.5).
+- `SurfaceView` 동영상은 종료 훅에서 `PixelCopy`를 비동기로 요청하고, 성공·실패·500ms 시간 제한
+  중 먼저 온 결과에서 종료를 계속한다(§3.5.2).
 - **같은 프레임에 `viewPager`·`appBarLayout`·`playerControlView` 를 감춘다** (§3.6 (1)).
 - **⚠️ 네 갈래를 전부 확인해야 한다.** 어느 뷰를 쓸지는 `shouldUseLargeImageView` 가 정하므로
   (픽셀×4 > 100MB, 또는 2048px 초과 + 비율 2:1 이상) 한쪽만 보면 절반을 못 본다.
@@ -782,6 +810,40 @@ ANDROID_HOME="C:\Users\hskang\AppData\Local\Android\Sdk" JAVA_HOME="/c/Program F
 실기기에서는 **개인 사진 폴더를 쓰지 않았다.** 위 네 개를 `/sdcard/PhotoExplorerTransitionTest`
 로 복사해 쓰고 지웠다.
 
+### 5.5 파일 목록 UI 통합 검증 (6차)
+
+검증일은 2026-09-11이다. `origin/feature/file-list-ui-refresh` (`f1d315fe`)를 기준으로
+`codex/integrate-shared-transition`에서 `83019a68` → `037f76f4`,
+`7d540783` → `d7cd2e97` 순서로 통합했다. `FileListAdapter`의 폴더 경로 집합·파일 위치 조회와
+`FileListFragment`의 구분선·공유 요소 콜백을 모두 유지했다.
+
+통합 직후 HDR용 `SurfaceView`와 5차의 `TextureView.bitmap` 설계가 충돌했다. 동영상 종료 로그는
+`setResult(CANCELED), nothing to send`였고 타일 복귀가 생략됐다. §3.5.2의 `PixelCopy` 방식으로
+고친 뒤 다음을 확인했다.
+
+API 근거: [Android `PixelCopy`](https://developer.android.com/reference/android/view/PixelCopy).
+
+환경: Pixel 8 AVD(`emulator-5554`), 디버그 APK, 기존 `MixTest` 미디어.
+
+| 항목 | 결과 및 근거 |
+|---|---|
+| `assembleDebug` | 통합 직후와 호환성 수정 후 모두 성공 |
+| `testDebugUnitTest` | `DirectoryItemCountLoaderTest` 7개, 실패·오류 0 |
+| 목록 UI | 폴더 개수·파일 메타데이터·즐겨찾기 바·경로 바 표시 확인 |
+| 사진 열기 및 페이지 이동 후 복귀 | `photo_1` → `photo_2` 후 뒤로가기와 아래로 끌기 모두 `photo_2`로 재매핑 |
+| 동영상 세 종료 경로 | `clip_1`에서 뒤로가기·툴바 화살표·아래로 끌기 각각 `PixelCopy result=0`, `RESULT_OK`, 그리드 재매핑 |
+| 손상 동영상 | `broken.mp4` 종료에서 공유 요소를 비우고 일반 종료, 목록 복귀 |
+| 크래시 | 위 실행 구간의 `AndroidRuntime` 오류 없음 |
+| 정적 확인 | `git diff --check` 통과 |
+
+화면 캡처는 `app/build/integration-result.png`에 남겼다(빌드 산출물, Git 비추적).
+기존 `Screenshots` 즐겨찾기 대상 폴더가 에뮬레이터에 없어 오류가 표시되어,
+기존 `MixTest` 폴더를 직접 열어 테스트했다.
+
+**검증 범위 밖** — 애니메이션 프레임별 품질, HDR 색·밝기, 실기기·R8 통합 빌드,
+화면 밖 타일 복귀, 화면 회전·액티비티 재생성, `PixelCopy` 시간 제한과 구형 API 분기는 확인하지 않았다.
+§5.4의 실기기 결과는 2026-09-04의 통합 전 빌드 결과이므로 이번 통합 빌드의 근거로 간주하지 않는다.
+
 ## 6. 바뀌는 파일
 
 | 파일 | 변경 | 단계 |
@@ -791,7 +853,7 @@ ANDROID_HOME="C:\Users\hskang\AppData\Local\Android\Sdk" JAVA_HOME="/c/Program F
 | `filelist/FileListAdapter.kt` | `transitionName` 설정/해제, `filePositionMap` 읽기용 접근자 | 2 |
 | `filelist/FileListFragment.kt` | 미디어 모드 사진 라우팅, `mediaTileImageFor`, 옵션 붙여 시작, exit 콜백 등록, 복귀 매핑·가드·스크롤 | 3·5·7·8 |
 | `viewer/media/MediaViewerActivity.kt` | `fragment` 필드, `onSupportNavigateUp()`, **enter 콜백 등록** | 4·5 |
-| `viewer/media/MediaViewerFragment.kt` | 종료 훅, `isReturning`, `hasSharedElement`, `currentPageContent()`, `transitionImage` 노출, `setResult`, 진입·복귀 양쪽 감추기, 변형 이어받기 | 4·5·6·9·10 |
+| `viewer/media/MediaViewerFragment.kt` | 종료 훅, `isReturning`, `hasSharedElement`, `currentPageContent()`, `transitionImage` 노출, `setResult`, 진입·복귀 양쪽 감추기, 변형 이어받기, `SurfaceView` 프레임 `PixelCopy`와 시간 제한 | 4·5·6·9·10 |
 | `viewer/media/MediaViewerAdapter.kt` | **`allowHardware(false)` 두 줄만** (§3.5.1, D24) | 5 |
 | `res/layout/media_viewer_fragment.xml` | `transitionImage` 추가 | 5 |
 | `filelist/FileListActivity.kt` | `onActivityReenter` 전달 (+ `isInitialized` 가드) | 7 |
@@ -816,6 +878,7 @@ ANDROID_HOME="C:\Users\hskang\AppData\Local\Android\Sdk" JAVA_HOME="/c/Program F
 | 대용량 사진에서 `drawToBitmap()` 이 무겁다 | 소 | 전체 화면 크기 비트맵 한 장. 종료 시 한 번뿐 |
 | 접힌/펼친 화면 전환 중 복귀 (Fold 7) | 소 | 11단계에서 같이 본다. 폴백으로 떨어져도 무방 |
 | 기본 `move` 전환의 속도가 미디어 모드 느낌과 안 맞는다 | 소 | 12단계 |
+| `PixelCopy`가 늦거나 실패해 종료가 멈춘다 | 중 | 500ms 시간 제한 뒤 그림 없는 일반 종료. API·Surface·크기·생명주기·현재 경로 가드 (§3.5.2) |
 
 ## 부록. 확정된 결정 기록
 
@@ -832,7 +895,7 @@ ANDROID_HOME="C:\Users\hskang\AppData\Local\Android\Sdk" JAVA_HOME="/c/Program F
 | D9 | 확대된 사진에서도 전환할 것인가 | **하지 않는다.** 폴백 |
 | D10 | `SwipeDownDismissLayout` 을 고칠 것인가 | **고치지 않는다.** 끌던 변형을 뷰어가 `transitionImage` 로 옮겨 받는다 (§3.6) |
 | D11 | 10번 D4(`onBackPressedDispatcher`)를 유지할 것인가 | **유지.** 다만 **세 경로가 자동으로 모인다고 본 것은 틀렸다** — D17을 볼 것 |
-| D12 | 동영상은 썸네일로 닫을 것인가 현재 프레임으로 닫을 것인가 | **현재 프레임.** `surface_type="texture_view"` 라 `TextureView.getBitmap()` 이 된다 |
+| D12 | 동영상은 썸네일로 닫을 것인가 현재 프레임으로 닫을 것인가 | **현재 프레임.** 처음에는 `TextureView.bitmap`, HDR용 `SurfaceView` 전환 뒤에는 `PixelCopy`로 얻는다 (§3.5.2) |
 | D13 | 기획서와 계획서를 나눌 것인가 | **나누지 않는다.** 새 파일 1개 + 고친 파일 8개 규모다 |
 | D14 | 사진을 어떻게 뷰어로 보낼 것인가 (2차) | **미디어 모드에서만 명시 라우팅.** 그대로 두면 동영상만 새 전환을 탄다 (§3.0) |
 | D15 | 뷰어 쪽 뷰에 `transitionName` 을 붙일 것인가 (2차) | **붙이지 않는다.** 복귀는 진입 때 실린 이름으로 짝을 찾으므로 도중에 바꾸면 깨진다 (§3.2) |
@@ -846,3 +909,4 @@ ANDROID_HOME="C:\Users\hskang\AppData\Local\Android\Sdk" JAVA_HOME="/c/Program F
 | D24 | 하드웨어 비트맵을 어떻게 할 것인가 (5차) | **`allowHardware(false)` 로 처음부터 막는다**, 그리드와 뷰어 양쪽. 나중에 복사하는 길은 `CrossfadeDrawable` 때문에 없다 (§3.5.1) |
 | D25 | 폴백에서도 페이지를 감출 것인가 (5차) | **감추지 않는다.** 평범한 창 애니메이션 내내 빈 화면이 날아간다 (§3.7) |
 | D21 | 로딩 완료를 어떻게 알 것인가 (4차) | **뷰 상태를 직접 읽는 `currentPageContent()` 하나로.** `MediaViewerAdapter` 에 콜백을 뚫지 않는다. 닫을 때의 그림·페이드아웃 시점·폴백 판정 셋이 같은 통로를 쓴다 (§3.5) |
+| D26 | `SurfaceView` 동영상의 현재 프레임을 어떻게 얻을 것인가 (6차) | **`PixelCopy`로 비동기 복사한다.** 500ms 안에 성공하지 않거나 대상이 바뀌면 그림 없는 일반 종료로 폴백한다 (§3.5.2) |

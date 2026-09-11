@@ -21,7 +21,7 @@
         <item name="android:windowAllowEnterTransitionOverlap">true</item>
         <item name="android:windowAllowReturnTransitionOverlap">true</item>
         <!--
-          ~ Shared element transitions between the media grid and the viewer, see plan 14 step 1.
+          ~ Shared element transitions between the media grid and the viewer, see plan 18 step 1.
           ~ Theme.Material already turns this on, but the parent chain is not ours to rely on.
           -->
         <item name="android:windowActivityTransitions">true</item>
@@ -76,7 +76,7 @@
         <item name="android:windowAllowEnterTransitionOverlap">true</item>
         <item name="android:windowAllowReturnTransitionOverlap">true</item>
         <!--
-          ~ Shared element transitions between the media grid and the viewer, see plan 14 step 1.
+          ~ Shared element transitions between the media grid and the viewer, see plan 18 step 1.
           ~ Theme.Material already turns this on, but the parent chain is not ours to rely on.
           -->
         <item name="android:windowActivityTransitions">true</item>

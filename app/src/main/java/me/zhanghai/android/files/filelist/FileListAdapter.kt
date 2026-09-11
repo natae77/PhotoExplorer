@@ -105,7 +105,7 @@ class FileListAdapter(
      * The full adapter position of [path], or null when it is not on the list.
      *
      * Media mode mixes date tiles in among the files, so counting files gives the wrong position -
-     * this map is the only honest answer. See plan 14 section 3.3.
+     * this map is the only honest answer. See plan 18 section 3.3.
      */
     fun findFilePosition(path: Path): Int? = filePositionMap[path]
 
@@ -458,7 +458,7 @@ class FileListAdapter(
             setImageDrawable(null)
             // Only media tiles take part in the shared element transition. bindFileViewHolder() is
             // shared by all three view types, so this has to be cleared for the other two rather
-            // than merely left unset. See plan 14 section 3.2.3.
+            // than merely left unset. See plan 18 section 3.2.3.
             transitionName = if (isMedia) mediaTransitionName(path) else null
             val shouldLoadThumbnail = supportsThumbnail && !shouldLoadThumbnailIcon
             isVisible = shouldLoadThumbnail

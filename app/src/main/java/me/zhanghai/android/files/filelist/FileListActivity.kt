@@ -37,7 +37,7 @@ class FileListActivity : AppActivity() {
     }
 
     /**
-     * Where the media viewer tells us which file to fly back into, see plan 14 section 3.4 (2).
+     * Where the media viewer tells us which file to fly back into, see plan 18 section 3.4 (2).
      *
      * This is called before the return transition starts, which is the only moment the grid still
      * has to scroll and remap the shared element in.

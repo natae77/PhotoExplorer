@@ -146,7 +146,7 @@ class MediaViewerAdapter(
                 size(Size.ORIGINAL)
                 // ⚠️ The return transition hands this drawable to the framework, which snapshots
                 // it into a software Canvas - a hardware bitmap throws there. Coil only sometimes
-                // returns one, so leaving it on crashes intermittently. See plan 14 section 3.5.
+                // returns one, so leaving it on crashes intermittently. See plan 18 section 3.5.
                 allowHardware(false)
                 fadeIn(binding.thumbnailImage.context.shortAnimTime)
                 listener(

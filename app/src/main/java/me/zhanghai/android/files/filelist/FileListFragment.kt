@@ -176,7 +176,7 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
     )
     // The viewer has to come back with a result for onActivityReenter() to be called at all, so it
     // cannot be started with startActivitySafe(). The result itself is read there, not here.
-    // See plan 14 section 3.3 (2).
+    // See plan 18 section 3.3 (2).
     private val openMediaViewerLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) {}
@@ -196,7 +196,7 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
     private var hasScrolledToLatest = false
 
     /**
-     * The file the media viewer wants to be flown back into, see plan 14 section 3.4.
+     * The file the media viewer wants to be flown back into, see plan 18 section 3.4.
      *
      * ⚠️ Also the flag that tells the exit callback which direction it is being called in - it is
      * called on the way out to the viewer too. Cleared when the viewer is started rather than when
@@ -290,7 +290,7 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
         )
         // ⚠️ Registered here rather than when the viewer is started: the coordinator that runs the
         // return reads this listener off the activity when the viewer is launched, so it has to be
-        // in place before then. See plan 14 section 3.4 (3).
+        // in place before then. See plan 18 section 3.4 (3).
         ActivityCompat.setExitSharedElementCallback(activity, mediaExitSharedElementCallback)
         val fastScroller = ThemedFastScroller.create(binding.recyclerView)
         binding.recyclerView.setOnApplyWindowInsetsListener(
@@ -1443,7 +1443,7 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
         //
         // Photos normally leave as an implicit image/* intent and only come back to us when we are
         // the default app, which would leave media mode with the transition on videos alone. In
-        // media mode we are the gallery, so we route them explicitly. See plan 14 section 3.0 (D14).
+        // media mode we are the gallery, so we route them explicitly. See plan 18 section 3.0 (D14).
         if (file.path.isPlayableVideo
             || (viewModel.viewType == FileViewType.MEDIA && file.mimeType.isImage)) {
             openMediaViewer(file)
@@ -1465,7 +1465,7 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
             openFileWithIntent(file, false)
             return
         }
-        // Whatever the last visit left behind is stale from here on, see plan 14 section 3.4 (3).
+        // Whatever the last visit left behind is stale from here on, see plan 18 section 3.4 (3).
         pendingReturnPath = null
         val options = mediaTransitionOptions(file.path)
         logMediaTransition(
@@ -1474,7 +1474,7 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
         )
         if (options == null) {
             // Not media mode, or the tile is not on screen: the plain activity transition then,
-            // quietly. See plan 14 section 3.7 (F1).
+            // quietly. See plan 18 section 3.7 (F1).
             startActivitySafe(intent)
             return
         }
@@ -1496,7 +1496,7 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
      * The thumbnail of [path]'s tile, or null when it has no view on screen right now.
      *
      * ⚠️ Media mode mixes date tiles in among the files, so the adapter's own map is the only
-     * honest way from a path to an adapter position. See plan 14 section 3.3.
+     * honest way from a path to an adapter position. See plan 18 section 3.3.
      */
     private fun mediaTileImageFor(path: Path): ImageView? {
         val position = adapter.findFilePosition(path) ?: return null
@@ -1506,7 +1506,7 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
     }
 
     /**
-     * Takes note of which file the viewer ended on, see plan 14 section 3.4 (2).
+     * Takes note of which file the viewer ended on, see plan 18 section 3.4 (2).
      *
      * Called before the return transition starts, so this is also where the grid still has time to
      * scroll a tile that is off screen into view.
@@ -1517,7 +1517,7 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
             return
         }
         // ⚠️ Videos open in our viewer from every view type, so without this the list and grid
-        // modes would jump around for a transition they never take part in. Plan 14 3.7 (F1).
+        // modes would jump around for a transition they never take part in. Plan 18 3.7 (F1).
         if (viewModel.viewType != FileViewType.MEDIA) {
             return
         }
@@ -1550,7 +1550,7 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
         logMediaTransition("grid reenter: postpone, scrolling to $position")
         layoutManager.scrollToPositionWithOffset(position, mediaReturnScrollOffset())
         // ⚠️ Without this the tile has no view yet when the shared element is mapped, and the
-        // transition falls back silently. See plan 14 section 3.4.
+        // transition falls back silently. See plan 18 section 3.4.
         binding.recyclerView.doOnPreDraw { resume.run() }
         // ⚠️ A postpone without its start freezes the screen, so it always has an end.
         binding.recyclerView.postDelayed(resume, POSTPONE_RETURN_TIMEOUT_MILLIS)
@@ -1570,7 +1570,7 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
     }
 
     /**
-     * Points the return transition at the tile of the file the viewer ended on, see plan 14 3.4 (3).
+     * Points the return transition at the tile of the file the viewer ended on, see plan 18 3.4 (3).
      *
      * ⚠️ This is called on the way out to the viewer as well, where the tile the framework already
      * found is the right one - hence doing nothing at all unless a return is pending.
@@ -1588,7 +1588,7 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
             val tile = mediaTileImageFor(path)
             if (tile == null) {
                 // The file is gone, or too far outside the list the viewer was given. Empty both,
-                // or the framework flies the tile we opened from. See plan 14 3.7 (F3).
+                // or the framework flies the tile we opened from. See plan 18 3.7 (F3).
                 logMediaTransition("grid map: no tile for $path -> blocked")
                 names.clear()
                 sharedElements.clear()
@@ -2020,7 +2020,7 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
         private const val MEDIA_VIEWER_PATH_LIST_SIZE_MAX = 1000
 
         /**
-         * How long to hold the return transition while the grid scrolls, see plan 14 section 3.4.
+         * How long to hold the return transition while the grid scrolls, see plan 18 section 3.4.
          *
          * A postpone that is never started leaves the screen frozen on the viewer, so the wait for
          * the layout pass is given an end even if that layout never comes.

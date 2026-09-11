@@ -112,7 +112,7 @@ class MediaViewerFragment :
     private var isScrubbing = false
 
     /**
-     * Whether we are on the way out, see plan 14 section 3.2.1.
+     * Whether we are on the way out, see plan 18 section 3.2.1.
      *
      * The activity's shared element callback is called in both directions, and the guard that
      * refuses to fly an empty rectangle back has to apply to the return only: on the way in, the
@@ -123,7 +123,7 @@ class MediaViewerFragment :
         private set
 
     /**
-     * Whether we were opened with a shared element at all, see plan 14 section 3.7 (F1, F2).
+     * Whether we were opened with a shared element at all, see plan 18 section 3.7 (F1, F2).
      *
      * A video opened from list mode, or a photo handed to us by another app, arrives with no
      * ActivityOptions and leaves on the plain window animation. Emptying the pager for those would
@@ -132,7 +132,7 @@ class MediaViewerFragment :
     private var hasSharedElement = false
 
     /**
-     * Whether the way in is still running, see plan 14 section 3.3.
+     * Whether the way in is still running, see plan 18 section 3.3.
      *
      * ⚠️ ViewPager2 dispatches onPageSelected() for the page we opened on during its first layout,
      * which lands in the middle of the enter transition. Without this the safety net there would
@@ -141,7 +141,7 @@ class MediaViewerFragment :
      */
     private var isEntering = false
 
-    /** The transition image, or null while there is no view, see plan 14 section 3.2.2. */
+    /** The transition image, or null while there is no view, see plan 18 section 3.2.2. */
     val transitionImageOrNull: ImageView?
         get() =
             if (view != null && this::binding.isInitialized) binding.transitionImage else null
@@ -245,7 +245,7 @@ class MediaViewerFragment :
                         hideTransitionImageWhenPageReady()
                     }
                     // The grid flies the page we leave from back into its own tile, and it only
-                    // learns which one that is from our result. See plan 14 section 3.4 (1).
+                    // learns which one that is from our result. See plan 18 section 3.4 (1).
                     requireActivity().setResult(
                         Activity.RESULT_OK, Intent().apply { extraPath = currentPath }
                     )
@@ -264,7 +264,7 @@ class MediaViewerFragment :
             // See plan 12 3.2.2.
             doOnPreDraw { startPlaybackIfVideoPage() }
         }
-        // The one place every way out passes through, see plan 14 section 3.6. Dragging down and
+        // The one place every way out passes through, see plan 18 section 3.6. Dragging down and
         // the system back button already come here; the toolbar arrow is sent here by
         // MediaViewerActivity.onSupportNavigateUp().
         addOnBackPressedCallback(object : OnBackPressedCallback(true) {
@@ -322,7 +322,7 @@ class MediaViewerFragment :
     }
 
     /**
-     * Hands the grid what it needs to fly the current media back into its tile, see plan 14
+     * Hands the grid what it needs to fly the current media back into its tile, see plan 18
      * sections 3.4 and 3.6.
      *
      * All of it happens in one frame, right before finishAfterTransition() captures the shared
@@ -333,7 +333,7 @@ class MediaViewerFragment :
         val activity = requireActivity()
         if (!hasSharedElement) {
             // Nothing to return to. Leaving the pager alone keeps the ordinary window animation
-            // showing the picture rather than an empty screen. See plan 14 section 3.7.
+            // showing the picture rather than an empty screen. See plan 18 section 3.7.
             logMediaTransition("viewer exit: no shared element, plain finish")
             activity.setResult(Activity.RESULT_CANCELED)
             return
@@ -343,7 +343,7 @@ class MediaViewerFragment :
         if (drawable == null) {
             // Nothing worth sending: a zoomed photo, a page still loading, or one that failed.
             // RESULT_CANCELED stops the grid from remapping, and the empty drawable is what stops
-            // our own callback from flying a blank rectangle. See plan 14 section 3.7.
+            // our own callback from flying a blank rectangle. See plan 18 section 3.7.
             logMediaTransition("viewer exit: setResult(CANCELED), nothing to send")
             transitionImage.animate().cancel()
             transitionImage.setImageDrawable(null)
@@ -356,7 +356,7 @@ class MediaViewerFragment :
             animate().cancel()
             alpha = 1f
             setImageDrawable(drawable)
-            // Carry on from wherever the downward drag left the page, see plan 14 section 3.6 (2).
+            // Carry on from wherever the downward drag left the page, see plan 18 section 3.6 (2).
             // Alpha is left alone: a shared element should stay opaque while it travels.
             val page = currentPageRoot()
             translationY = page?.translationY ?: 0f
@@ -364,7 +364,7 @@ class MediaViewerFragment :
             scaleY = page?.scaleY ?: 1f
         }
         // The window lets the return transition overlap, so the same picture would otherwise be on
-        // screen twice - one flying to the tile, one fading out in place. Plan 14 3.6 (1).
+        // screen twice - one flying to the tile, one fading out in place. Plan 18 3.6 (1).
         binding.viewPager.isVisible = false
         binding.appBarLayout.isVisible = false
         binding.playerControlView.visibility = View.GONE
@@ -373,7 +373,7 @@ class MediaViewerFragment :
     /** The picture to fly back with, or null when this page cannot take part (F4, F5). */
     private fun returnDrawable(): Drawable? {
         // A zoomed photo is not where it started, so there is nothing sensible to fly. The drag to
-        // dismiss test already asks exactly this question. See plan 14 section 3.7.
+        // dismiss test already asks exactly this question. See plan 18 section 3.7.
         if (currentPageRoot()?.canDismiss?.invoke() == false) {
             return null
         }
@@ -406,11 +406,11 @@ class MediaViewerFragment :
     }
 
     /**
-     * Fills the transition image with the picture we came in with, see plan 14 section 3.3.
+     * Fills the transition image with the picture we came in with, see plan 18 section 3.3.
      *
      * The snapshot is what the framework captured of the grid tile. Its default implementation
      * makes either an ImageView carrying a drawable or a plain View carrying a background, so both
-     * have to be read. See plan 14 section 3.5.
+     * have to be read. See plan 18 section 3.5.
      */
     /**
      * Called when the framework accepts our transition image on the way in.
@@ -475,7 +475,7 @@ class MediaViewerFragment :
     }
 
     /**
-     * Fades the transition image out once the page underneath has something to show, see plan 14
+     * Fades the transition image out once the page underneath has something to show, see plan 18
      * section 3.3.
      *
      * Going by the transition alone would blink a blank screen for a page that is still loading.
@@ -500,7 +500,7 @@ class MediaViewerFragment :
             .setDuration(mediumAnimTime.toLong())
             .withEndAction {
                 // Emptied rather than hidden: it has to stay VISIBLE for the return transition to
-                // be able to capture it at all. See plan 14 section 3.1.
+                // be able to capture it at all. See plan 18 section 3.1.
                 transitionImage.setImageDrawable(null)
                 transitionImage.alpha = 1f
             }
@@ -508,7 +508,7 @@ class MediaViewerFragment :
     }
 
     /**
-     * What the page on screen can show right now, see plan 14 section 3.5.
+     * What the page on screen can show right now, see plan 18 section 3.5.
      *
      * Read straight off the views: loading finishes inside MediaViewerAdapter and there is no way
      * out of it, and this is only asked twice in a viewer session.
@@ -536,7 +536,7 @@ class MediaViewerFragment :
                 when {
                     itemBinding.errorLayout.isVisible -> PageContent.Error
                     // Playing: the current frame is what the eye is on, and the texture is already
-                    // the size of the video rather than of the whole page. Plan 14 D12.
+                    // the size of the video rather than of the whole page. Plan 18 D12.
                     itemBinding.playerView.isVisible ->
                         (itemBinding.playerView.videoSurfaceView as? TextureView)?.bitmap
                             ?.let { PageContent.Ready(BitmapDrawable(resources, it)) }
@@ -556,7 +556,7 @@ class MediaViewerFragment :
      * Drawing the whole view in would bring the black bars with it, and the framework applies the
      * tile's centerCrop at the far end of the transition - so a landscape photo would jump at the
      * very last moment. PhotoView hands over its original drawable and a TextureView is already
-     * the shape of the video, so only this branch has to crop. See plan 14 section 3.5.
+     * the shape of the video, so only this branch has to crop. See plan 18 section 3.5.
      */
     private fun largeImageContent(view: SubsamplingScaleImageView): PageContent {
         val viewWidth = view.width
@@ -978,7 +978,7 @@ class MediaViewerFragment :
         private val PLAYBACK_SPEEDS = floatArrayOf(0.25f, 0.5f, 0.75f, 1f, 1.5f, 2f)
 
         /**
-         * How many frames to wait for the page under the entering picture, see plan 14 section 3.3.
+         * How many frames to wait for the page under the entering picture, see plan 18 section 3.3.
          *
          * A photo off the disk arrives within a couple of frames; anything slower has to give up
          * rather than leave the picture stuck on top of the pager.
