@@ -355,7 +355,14 @@ class MediaViewerFragment :
         val exitPath = currentPath
         val surface = currentVideoBinding?.playerView?.videoSurfaceView as? SurfaceView
         lockReturnInput()
-        if (!hasSharedElement || surface == null || renderedVideoPath != exitPath
+        if (!hasSharedElement) {
+            prepareReturnTransition()
+            // The translucent viewer window does not receive Android's ordinary close animation,
+            // so explicitly restore it for list/grid launches without a shared element.
+            (exitActivity as MediaViewerActivity).finishWithPlainAnimation()
+            return
+        }
+        if (surface == null || renderedVideoPath != exitPath
             || Build.VERSION.SDK_INT < Build.VERSION_CODES.N
             || !surface.holder.surface.isValid || surface.width <= 0 || surface.height <= 0) {
             prepareReturnTransition()

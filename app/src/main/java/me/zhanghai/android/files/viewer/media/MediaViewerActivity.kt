@@ -19,6 +19,7 @@ import androidx.core.app.SharedElementCallback
 import androidx.fragment.app.commit
 import androidx.interpolator.view.animation.FastOutSlowInInterpolator
 import java8.nio.file.Path
+import me.zhanghai.android.files.R
 import me.zhanghai.android.files.app.AppActivity
 import me.zhanghai.android.files.util.extraPathList
 import me.zhanghai.android.files.util.putArgs
@@ -101,6 +102,22 @@ class MediaViewerActivity : AppActivity() {
     override fun onSupportNavigateUp(): Boolean {
         onBackPressedDispatcher.onBackPressed()
         return true
+    }
+
+    /**
+     * Closes a viewer that has no shared element using the app's former activity animation.
+     *
+     * The viewer window became translucent so swipe-down can reveal the file list underneath.
+     * Android does not apply its normal close animation to that translucent window, so the
+     * previous file list no longer slides in from the left unless we request it explicitly.
+     */
+    fun finishWithPlainAnimation() {
+        finish()
+        @Suppress("DEPRECATION")
+        overridePendingTransition(
+            R.anim.media_viewer_close_enter,
+            R.anim.media_viewer_close_exit
+        )
     }
 
     fun setViewerBackgroundAlpha(alpha: Float) {

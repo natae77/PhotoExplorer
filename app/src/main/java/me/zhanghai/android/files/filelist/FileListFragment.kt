@@ -20,6 +20,7 @@ import android.os.Bundle
 import android.os.Environment
 import android.os.Handler
 import android.os.Looper
+import android.os.Parcelable
 import android.text.TextUtils
 import android.view.KeyCharacterMap
 import android.view.KeyEvent
@@ -132,6 +133,7 @@ import me.zhanghai.android.files.util.extraPath
 import me.zhanghai.android.files.util.extraPathList
 import me.zhanghai.android.files.util.fadeToVisibilityUnsafe
 import me.zhanghai.android.files.util.getDimensionDp
+import me.zhanghai.android.files.util.getParcelableSafe
 import me.zhanghai.android.files.util.getQuantityString
 import me.zhanghai.android.files.util.hasSw600Dp
 import me.zhanghai.android.files.util.isOrientationLandscape
@@ -203,6 +205,12 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
     // Media mode starts at the newest item, but only once per folder. See plan step 5.
     private var hasScrolledToLatest = false
 
+    // RecyclerView restores its own state after Fragment state restoration, but media mode also
+    // has an explicit "scroll to latest" step when the already loaded list is delivered again.
+    // Keep a state that we can consume before that step so a configuration change cannot be
+    // mistaken for the first visit to the folder.
+    private var pendingLayoutManagerState: Parcelable? = null
+
     /**
      * The file the media viewer wants to be flown back into, see plan 18 section 3.4.
      *
@@ -272,6 +280,9 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
         )
         mediaOpeningSharedElementPath = savedInstanceState
             ?.getString(STATE_MEDIA_OPENING_SHARED_ELEMENT_PATH)?.let(Paths::get)
+        pendingLayoutManagerState = savedInstanceState?.getParcelableSafe(
+            STATE_LAYOUT_MANAGER
+        )
         setHasOptionsMenu(true)
     }
 
@@ -490,6 +501,13 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
+        // While a new folder is loading the adapter can still show the previous folder. Saving
+        // that viewport against the new path would restore an unrelated position after rotation.
+        if (loadedPath == viewModel.currentPath) {
+            layoutManager.onSaveInstanceState()?.let {
+                outState.putParcelable(STATE_LAYOUT_MANAGER, it)
+            }
+        }
         activeMediaViewportSessionId?.let {
             outState.putString(STATE_ACTIVE_MEDIA_VIEWPORT_SESSION_ID, it)
         }
@@ -773,7 +791,9 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
             // pendingState is a *consuming* getter: TrailData.pendingState does
             // states.set(currentIndex, null), which returns the old value and clears the slot. It
             // must be read exactly once, or the restore below gets null. See plan step 5.
-            val pendingState = viewModel.pendingState
+            val trailPendingState = viewModel.pendingState
+            val pendingState = pendingLayoutManagerState ?: trailPendingState
+            pendingLayoutManagerState = null
             when {
                 pendingState != null -> {
                     layoutManager.onRestoreInstanceState(pendingState)
@@ -2362,6 +2382,7 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
             "activeMediaViewportSessionId"
         private const val STATE_MEDIA_OPENING_SHARED_ELEMENT_PATH =
             "mediaOpeningSharedElementPath"
+        private const val STATE_LAYOUT_MANAGER = "layoutManager"
     }
 
     private class RequestAllFilesAccessContract : ActivityResultContract<Unit, Boolean>() {
