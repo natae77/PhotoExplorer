@@ -36,11 +36,11 @@ import androidx.fragment.app.Fragment
 import androidx.interpolator.view.animation.FastOutSlowInInterpolator
 import androidx.media3.common.C
 import androidx.media3.common.PlaybackException
-import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
-import androidx.media3.exoplayer.SeekParameters
+import androidx.media3.common.Tracks
 import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.SeekParameters
 import androidx.media3.ui.DefaultTimeBar
 import androidx.media3.ui.TimeBar
 import androidx.lifecycle.lifecycleScope
@@ -811,8 +811,7 @@ class MediaViewerFragment :
         playerView.isVisible = true
         renderedVideoPath = null
         holder.play(path, playerView, viewModel.playbackPositions[path] ?: 0L)
-        // The speed is shared by every video of the session, see spec 11 section 6.3.
-        holder.exoPlayer.setPlaybackSpeed(viewModel.playbackSpeed)
+        applyPlaybackSpeed(holder.exoPlayer, viewModel.playbackSpeed)
     }
 
     private fun setupPrimaryMediaControls() {
@@ -1018,13 +1017,15 @@ class MediaViewerFragment :
             }
         }
 
-        override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
-            // Our own menu is the only way to change this now, but keeping our copy in sync
-            // keeps the checked menu item honest and stops the next video from reverting the
-            // speed.
-            if (playbackParameters.speed != viewModel.playbackSpeed) {
-                viewModel.playbackSpeed = playbackParameters.speed
-                requireActivity().invalidateOptionsMenu()
+        override fun onTracksChanged(tracks: Tracks) {
+            val player = playerHolder?.exoPlayer ?: return
+            val speed = viewModel.playbackSpeed
+            // AudioTrack clamps playback to 0.1x. Once the audio renderer has been disabled,
+            // apply 0.04x again so the standalone video clock owns the requested speed.
+            if (speed < MIN_AUDIO_PLAYBACK_SPEED
+                && C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes
+                && player.playbackParameters.speed != speed) {
+                player.setPlaybackSpeed(speed)
             }
         }
 
@@ -1112,8 +1113,9 @@ class MediaViewerFragment :
         menu.findItem(R.id.action_video_seek_unit).isVisible = isVideo
         menu.findItem(R.id.action_video_details).isVisible = isVideo
         if (isVideo) {
-            // indexOf() is not available for FloatArray because of NaN.
-            val index = PLAYBACK_SPEEDS.indexOfFirst { it == viewModel.playbackSpeed }
+            val index = SUPPORTED_VIDEO_PLAYBACK_SPEEDS.indexOfFirst {
+                it == viewModel.playbackSpeed
+            }
             // Only the matching item is touched: in a checkableBehavior="single" group,
             // setChecked(false) also makes that item the checked one (MenuItemImpl.setChecked()).
             if (index != -1) {
@@ -1135,9 +1137,7 @@ class MediaViewerFragment :
             R.id.action_speed_0_1 -> { setPlaybackSpeed(0.1f); true }
             R.id.action_speed_0_25 -> { setPlaybackSpeed(0.25f); true }
             R.id.action_speed_0_5 -> { setPlaybackSpeed(0.5f); true }
-            R.id.action_speed_0_75 -> { setPlaybackSpeed(0.75f); true }
             R.id.action_speed_1 -> { setPlaybackSpeed(1f); true }
-            R.id.action_speed_1_5 -> { setPlaybackSpeed(1.5f); true }
             R.id.action_speed_2 -> { setPlaybackSpeed(2f); true }
             R.id.action_seek_by_frame -> { setVideoSeekUnit(VideoSeekUnit.FRAME); true }
             R.id.action_seek_by_second -> { setVideoSeekUnit(VideoSeekUnit.SECOND); true }
@@ -1260,7 +1260,18 @@ class MediaViewerFragment :
 
     private fun setPlaybackSpeed(speed: Float) {
         viewModel.playbackSpeed = speed
-        playerHolder?.exoPlayer?.setPlaybackSpeed(speed)
+        playerHolder?.exoPlayer?.let { applyPlaybackSpeed(it, speed) }
+    }
+
+    private fun applyPlaybackSpeed(player: Player, speed: Float) {
+        val disableAudio = speed < MIN_AUDIO_PLAYBACK_SPEED
+        val parameters = player.trackSelectionParameters
+        if ((C.TRACK_TYPE_AUDIO in parameters.disabledTrackTypes) != disableAudio) {
+            player.trackSelectionParameters = parameters.buildUpon()
+                .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, disableAudio)
+                .build()
+        }
+        player.setPlaybackSpeed(speed)
     }
 
     private fun share() {
@@ -1279,11 +1290,7 @@ class MediaViewerFragment :
     companion object {
         private const val BACKGROUND_FULL_REVEAL_FRACTION = 0.125f
         private const val BACKGROUND_ALPHA_AT_DRAG_START = 0.85f
-
-        // Spec 11 section 6.3. The two slowest values support detailed review without requiring
-        // automatic frame-by-frame playback; 0.04x advances a 60 fps video at 24 frames/10 s.
-        private val PLAYBACK_SPEEDS =
-            floatArrayOf(0.04f, 0.1f, 0.25f, 0.5f, 0.75f, 1f, 1.5f, 2f)
+        private const val MIN_AUDIO_PLAYBACK_SPEED = 0.1f
 
         /**
          * How many frames to wait for the page under the entering picture, see plan 18 section 3.3.
@@ -1301,8 +1308,8 @@ class MediaViewerFragment :
 
         private val SPEED_ITEM_IDS = intArrayOf(
             R.id.action_speed_0_04, R.id.action_speed_0_1,
-            R.id.action_speed_0_25, R.id.action_speed_0_5, R.id.action_speed_0_75,
-            R.id.action_speed_1, R.id.action_speed_1_5, R.id.action_speed_2
+            R.id.action_speed_0_25, R.id.action_speed_0_5,
+            R.id.action_speed_1, R.id.action_speed_2
         )
     }
 

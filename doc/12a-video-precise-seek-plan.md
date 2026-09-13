@@ -33,7 +33,7 @@
 |---|---|
 | `VideoPlayerHolder` | ExoPlayer 하나의 생성·부착·정지·해제, 10초 탐색 간격 |
 | `MediaViewerFragment` | 현재 페이지와 플레이어 연결, 컨트롤·메뉴·스크럽 이벤트 |
-| `MediaViewerViewModel` | 영상별 위치, 세션 배속, 세부 정보 캐시 |
+| `MediaViewerViewModel` | 영상별 위치, 영구 저장된 배속 복원, 세부 정보 캐시 |
 | `media_viewer_player_control.xml` | Media3 id를 가진 32dp 버튼을 52dp 원형 래퍼 안에 배치 |
 | `media_viewer.xml` | 재생 속도, 세부 정보, 삭제, 공유 |
 

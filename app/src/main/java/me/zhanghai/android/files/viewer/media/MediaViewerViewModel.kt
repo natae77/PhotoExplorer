@@ -18,6 +18,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import me.zhanghai.android.files.provider.common.readAttributes
 import me.zhanghai.android.files.provider.linux.isLinuxPath
+import me.zhanghai.android.files.settings.Settings
+import me.zhanghai.android.files.util.valueCompat
 import java8.nio.file.attribute.BasicFileAttributes
 
 /**
@@ -28,8 +30,14 @@ class MediaViewerViewModel : ViewModel() {
     /** Playback position per video, in milliseconds. */
     val playbackPositions = mutableMapOf<Path, Long>()
 
-    /** Shared by every video in this session, back to 1x when the viewer is closed. */
-    var playbackSpeed = 1f
+    /** Shared by every video and restored the next time a viewer is opened. */
+    var playbackSpeed = parsePersistedVideoPlaybackSpeed(
+        Settings.MEDIA_VIEWER_PLAYBACK_SPEED.valueCompat
+    )
+        set(value) {
+            field = value
+            Settings.MEDIA_VIEWER_PLAYBACK_SPEED.putValue(value.toString())
+        }
 
     /** Shared by every video in this viewer session; frame stepping is the deliberate default. */
     var videoSeekUnit = VideoSeekUnit.FRAME
