@@ -752,6 +752,9 @@ class MediaViewerFragment :
         val holder = playerHolder ?: return
         val playingPath = holder.currentPath ?: return
         if (playingPath != currentPath) {
+            // EXACT belongs to the frame cursor for the page being left. Reset it before the
+            // single player is reused by another video.
+            clearFrameCursor()
             rememberPosition(holder, playingPath)
             restoreVideoPage(playingPath)
             holder.detach()
@@ -1041,7 +1044,14 @@ class MediaViewerFragment :
             newPosition: Player.PositionInfo,
             reason: Int
         ) {
-            playerHolder?.exoPlayer?.setSeekParameters(SeekParameters.DEFAULT)
+            // seekTo() is processed asynchronously. Restoring DEFAULT on its immediate
+            // discontinuity callback can race the decoder after this player has been reused for
+            // another page, turning a one-frame seek into a no-op at the nearest sync point.
+            // Keep EXACT for the lifetime of the frame cursor; play, scrub, page changes, and the
+            // one-second mode all clear the cursor and restore DEFAULT explicitly.
+            if (viewModel.frameCursor == null) {
+                playerHolder?.exoPlayer?.setSeekParameters(SeekParameters.DEFAULT)
+            }
             updatePrimaryMediaControls()
         }
     }
