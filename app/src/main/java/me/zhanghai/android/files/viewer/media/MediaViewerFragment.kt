@@ -1131,6 +1131,8 @@ class MediaViewerFragment :
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean =
         when (item.itemId) {
+            R.id.action_speed_0_04 -> { setPlaybackSpeed(0.04f); true }
+            R.id.action_speed_0_1 -> { setPlaybackSpeed(0.1f); true }
             R.id.action_speed_0_25 -> { setPlaybackSpeed(0.25f); true }
             R.id.action_speed_0_5 -> { setPlaybackSpeed(0.5f); true }
             R.id.action_speed_0_75 -> { setPlaybackSpeed(0.75f); true }
@@ -1278,8 +1280,10 @@ class MediaViewerFragment :
         private const val BACKGROUND_FULL_REVEAL_FRACTION = 0.125f
         private const val BACKGROUND_ALPHA_AT_DRAG_START = 0.85f
 
-        // Spec 11 section 6.3. 0.25 is there to slow fast motion down, e.g. a golf swing.
-        private val PLAYBACK_SPEEDS = floatArrayOf(0.25f, 0.5f, 0.75f, 1f, 1.5f, 2f)
+        // Spec 11 section 6.3. The two slowest values support detailed review without requiring
+        // automatic frame-by-frame playback; 0.04x advances a 60 fps video at 24 frames/10 s.
+        private val PLAYBACK_SPEEDS =
+            floatArrayOf(0.04f, 0.1f, 0.25f, 0.5f, 0.75f, 1f, 1.5f, 2f)
 
         /**
          * How many frames to wait for the page under the entering picture, see plan 18 section 3.3.
@@ -1296,6 +1300,7 @@ class MediaViewerFragment :
         private const val ENTER_END_TIMEOUT_MILLIS = 1500L
 
         private val SPEED_ITEM_IDS = intArrayOf(
+            R.id.action_speed_0_04, R.id.action_speed_0_1,
             R.id.action_speed_0_25, R.id.action_speed_0_5, R.id.action_speed_0_75,
             R.id.action_speed_1, R.id.action_speed_1_5, R.id.action_speed_2
         )

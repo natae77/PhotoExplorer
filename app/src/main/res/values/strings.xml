@@ -714,6 +714,8 @@
     <string name="media_viewer_back_one_second">Back 1 second</string>
     <string name="media_viewer_forward_one_second">Forward 1 second</string>
     <string name="media_viewer_frame_timeline_unavailable">Frame information is unavailable. Choose “Second” from Move unit.</string>
+    <string name="media_viewer_speed_0_04">0.04\u00d7</string>
+    <string name="media_viewer_speed_0_1">0.1\u00d7</string>
     <string name="media_viewer_speed_0_25">0.25\u00d7</string>
     <string name="media_viewer_speed_0_5">0.5\u00d7</string>
     <string name="media_viewer_speed_0_75">0.75\u00d7</string>
