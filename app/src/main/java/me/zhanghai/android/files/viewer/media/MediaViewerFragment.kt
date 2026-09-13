@@ -25,6 +25,7 @@ import android.view.TextureView
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
+import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
 import androidx.annotation.OptIn
 import androidx.appcompat.app.AppCompatActivity
@@ -37,6 +38,7 @@ import androidx.media3.common.C
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
+import androidx.media3.exoplayer.SeekParameters
 import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.DefaultTimeBar
@@ -112,6 +114,8 @@ class MediaViewerFragment :
 
     /** A finger on the slider keeps the player buffering, see spec 11a section 6.1. */
     private var isScrubbing = false
+
+    private var unavailableTimelineGenerationShown = -1L
 
     /**
      * Whether we are on the way out, see plan 18 section 3.2.1.
@@ -259,6 +263,7 @@ class MediaViewerFragment :
             ?.addListener(object : TimeBar.OnScrubListener {
                 override fun onScrubStart(timeBar: TimeBar, position: Long) {
                     isScrubbing = true
+                    clearFrameCursor()
                     currentVideoHolder?.progress?.end(DelayedProgress.Reason.BUFFERING)
                 }
 
@@ -268,6 +273,17 @@ class MediaViewerFragment :
                     isScrubbing = false
                 }
             })
+        setupPrimaryMediaControls()
+        viewModel.frameTimelineState.observe(viewLifecycleOwner) { state ->
+            if (state is VideoFrameTimelineState.Unavailable
+                && state.path == currentPath
+                && state.generation != unavailableTimelineGenerationShown
+                && viewModel.videoSeekUnit == VideoSeekUnit.FRAME) {
+                unavailableTimelineGenerationShown = state.generation
+                showToast(R.string.media_viewer_frame_timeline_unavailable)
+            }
+            updatePrimaryMediaControls()
+        }
         systemUiHelper = SystemUiHelper(
             activity, SystemUiHelper.LEVEL_IMMERSIVE, SystemUiHelper.FLAG_IMMERSIVE_STICKY
         ) { visible: Boolean ->
@@ -708,6 +724,7 @@ class MediaViewerFragment :
         holder.release()
         playerHolder = null
         binding.playerControlView.player = null
+        viewModel.cancelFrameTimelineRequest()
     }
 
     override fun onDestroyView() {
@@ -773,6 +790,7 @@ class MediaViewerFragment :
         val path = currentPath
         if (!path.isPlayableVideo) {
             playerHolder?.detach()
+            viewModel.cancelFrameTimelineRequest()
             return
         }
         val playerView = currentVideoBinding?.playerView ?: return
@@ -792,6 +810,144 @@ class MediaViewerFragment :
         holder.play(path, playerView, viewModel.playbackPositions[path] ?: 0L)
         // The speed is shared by every video of the session, see spec 11 section 6.3.
         holder.exoPlayer.setPlaybackSpeed(viewModel.playbackSpeed)
+    }
+
+    private fun setupPrimaryMediaControls() {
+        binding.playerControlView.findViewById<PrimaryMediaControlButton>(
+            R.id.media_viewer_seek_back
+        ).setOnClickListener { moveVideo(-1) }
+        binding.playerControlView.findViewById<PrimaryMediaControlButton>(
+            R.id.media_viewer_play_pause
+        ).setOnClickListener {
+            clearFrameCursor()
+            playerHolder?.exoPlayer?.let { player ->
+                if (player.playbackState == Player.STATE_ENDED) {
+                    player.seekTo(0L)
+                    player.play()
+                } else if (player.isPlaying || player.playWhenReady) {
+                    player.pause()
+                } else {
+                    player.play()
+                }
+                updatePrimaryMediaControls()
+            }
+        }
+        binding.playerControlView.findViewById<PrimaryMediaControlButton>(
+            R.id.media_viewer_seek_forward
+        ).setOnClickListener { moveVideo(1) }
+        updatePrimaryMediaControls()
+    }
+
+    private fun moveVideo(direction: Int) {
+        val holder = playerHolder ?: return
+        val player = holder.exoPlayer
+        if (holder.currentPath != currentPath) return
+        if (viewModel.videoSeekUnit == VideoSeekUnit.SECOND) {
+            clearFrameCursor()
+            if (direction < 0) player.seekBack() else player.seekForward()
+            return
+        }
+        val state = viewModel.frameTimelineState.value as? VideoFrameTimelineState.Ready ?: return
+        if (state.path != currentPath) return
+        player.pause()
+        val cursor = viewModel.frameCursor
+        val targetIndex = if (cursor?.path == currentPath && cursor.generation == state.generation) {
+            cursor.index + direction
+        } else {
+            state.timeline.adjacentIndex(player.currentPosition, direction) ?: return
+        }
+        val targetPositionMs = state.timeline.seekPositionMs(targetIndex) ?: return
+        viewModel.frameCursor = VideoFrameCursor(currentPath, targetIndex, state.generation)
+        player.setSeekParameters(SeekParameters.EXACT)
+        player.seekTo(targetPositionMs)
+        updatePrimaryMediaControls()
+    }
+
+    private fun clearFrameCursor() {
+        viewModel.frameCursor = null
+        playerHolder?.exoPlayer?.setSeekParameters(SeekParameters.DEFAULT)
+    }
+
+    private fun ensureFrameTimeline() {
+        if (viewModel.videoSeekUnit != VideoSeekUnit.FRAME) return
+        val holder = playerHolder ?: return
+        val path = holder.currentPath ?: return
+        if (path != currentPath || holder.exoPlayer.playbackState != Player.STATE_READY) return
+        viewModel.requestFrameTimeline(
+            requireContext(), path, VideoTrackIdentity.from(holder.exoPlayer.videoFormat)
+        )
+    }
+
+    private fun setVideoSeekUnit(unit: VideoSeekUnit) {
+        if (viewModel.videoSeekUnit == unit) return
+        viewModel.videoSeekUnit = unit
+        clearFrameCursor()
+        if (unit == VideoSeekUnit.FRAME) {
+            ensureFrameTimeline()
+        } else {
+            viewModel.cancelFrameTimelineRequest()
+        }
+        updatePrimaryMediaControls()
+        requireActivity().invalidateOptionsMenu()
+    }
+
+    private fun updatePrimaryMediaControls() {
+        if (!this::binding.isInitialized) return
+        val controlView = binding.playerControlView
+        val back = controlView.findViewById<PrimaryMediaControlButton>(R.id.media_viewer_seek_back)
+            ?: return
+        val playPause = controlView.findViewById<PrimaryMediaControlButton>(
+            R.id.media_viewer_play_pause
+        )
+        val forward = controlView.findViewById<PrimaryMediaControlButton>(
+            R.id.media_viewer_seek_forward
+        )
+        val player = playerHolder?.exoPlayer
+        val ownsCurrentPath = playerHolder?.currentPath == currentPath
+        if (viewModel.videoSeekUnit == VideoSeekUnit.SECOND) {
+            back.contentDescription = getString(R.string.media_viewer_back_one_second)
+            forward.contentDescription = getString(R.string.media_viewer_forward_one_second)
+            back.isEnabled = ownsCurrentPath && player?.isCommandAvailable(Player.COMMAND_SEEK_BACK) == true
+            forward.isEnabled = ownsCurrentPath
+                && player?.isCommandAvailable(Player.COMMAND_SEEK_FORWARD) == true
+        } else {
+            back.contentDescription = getString(R.string.media_viewer_previous_frame)
+            forward.contentDescription = getString(R.string.media_viewer_next_frame)
+            val state = viewModel.frameTimelineState.value as? VideoFrameTimelineState.Ready
+            if (ownsCurrentPath && state?.path == currentPath && player != null) {
+                val cursor = viewModel.frameCursor
+                    ?.takeIf { it.path == currentPath && it.generation == state.generation }
+                val backIndex = cursor?.index?.minus(1)
+                    ?: state.timeline.adjacentIndex(player.currentPosition, -1)
+                val forwardIndex = cursor?.index?.plus(1)
+                    ?: state.timeline.adjacentIndex(player.currentPosition, 1)
+                back.isEnabled = backIndex?.let { state.timeline.seekPositionMs(it) } != null
+                forward.isEnabled = forwardIndex?.let { state.timeline.seekPositionMs(it) } != null
+            } else {
+                back.isEnabled = false
+                forward.isEnabled = false
+            }
+        }
+        val innerPlayPause = controlView.findViewById<View>(androidx.media3.ui.R.id.exo_play_pause)
+        val stepLabel = "1"
+        controlView.findViewById<TextView>(androidx.media3.ui.R.id.exo_rew_with_amount).post {
+            controlView.findViewById<TextView>(androidx.media3.ui.R.id.exo_rew_with_amount).text =
+                stepLabel
+            controlView.findViewById<TextView>(androidx.media3.ui.R.id.exo_ffwd_with_amount).text =
+                stepLabel
+        }
+        playPause.isEnabled = ownsCurrentPath && innerPlayPause.isEnabled
+        playPause.contentDescription = getString(
+            if (player?.playWhenReady == true && player.playbackState != Player.STATE_ENDED) {
+                androidx.media3.ui.R.string.exo_controls_pause_description
+            } else {
+                androidx.media3.ui.R.string.exo_controls_play_description
+            }
+        )
+        // PlayerControlView still owns the icon and enabled state; let its update settle first.
+        playPause.post {
+            playPause.isEnabled = playerHolder?.currentPath == currentPath && innerPlayPause.isEnabled
+        }
     }
 
     /** Photo pages never show the controls, see spec 11 section 6.2. */
@@ -850,7 +1006,9 @@ class MediaViewerFragment :
             if (playbackState == Player.STATE_READY) {
                 // videoFormat and duration are known only now, see spec 11 section 7.1.
                 updateVideoDetailsSheet()
+                ensureFrameTimeline()
             }
+            updatePrimaryMediaControls()
             if (playbackState == Player.STATE_ENDED) {
                 // Otherwise coming back to this video would start it at its last frame.
                 playerHolder?.currentPath?.let { viewModel.playbackPositions.remove(it) }
@@ -874,6 +1032,17 @@ class MediaViewerFragment :
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             // A view flag instead of a window flag: it is cleared when the view leaves the window.
             binding.root.keepScreenOn = isPlaying
+            if (isPlaying) clearFrameCursor()
+            updatePrimaryMediaControls()
+        }
+
+        override fun onPositionDiscontinuity(
+            oldPosition: Player.PositionInfo,
+            newPosition: Player.PositionInfo,
+            reason: Int
+        ) {
+            playerHolder?.exoPlayer?.setSeekParameters(SeekParameters.DEFAULT)
+            updatePrimaryMediaControls()
         }
     }
 
@@ -930,6 +1099,7 @@ class MediaViewerFragment :
         }
         val isVideo = currentPath.isPlayableVideo
         menu.findItem(R.id.action_playback_speed).isVisible = isVideo
+        menu.findItem(R.id.action_video_seek_unit).isVisible = isVideo
         menu.findItem(R.id.action_video_details).isVisible = isVideo
         if (isVideo) {
             // indexOf() is not available for FloatArray because of NaN.
@@ -939,6 +1109,13 @@ class MediaViewerFragment :
             if (index != -1) {
                 menu.findItem(SPEED_ITEM_IDS[index]).isChecked = true
             }
+            menu.findItem(
+                if (viewModel.videoSeekUnit == VideoSeekUnit.FRAME) {
+                    R.id.action_seek_by_frame
+                } else {
+                    R.id.action_seek_by_second
+                }
+            ).isChecked = true
         }
     }
 
@@ -950,6 +1127,8 @@ class MediaViewerFragment :
             R.id.action_speed_1 -> { setPlaybackSpeed(1f); true }
             R.id.action_speed_1_5 -> { setPlaybackSpeed(1.5f); true }
             R.id.action_speed_2 -> { setPlaybackSpeed(2f); true }
+            R.id.action_seek_by_frame -> { setVideoSeekUnit(VideoSeekUnit.FRAME); true }
+            R.id.action_seek_by_second -> { setVideoSeekUnit(VideoSeekUnit.SECOND); true }
             R.id.action_video_details -> {
                 showVideoDetails()
                 true
@@ -974,6 +1153,7 @@ class MediaViewerFragment :
         playerHolder?.let { if (it.currentPath == path) it.detach() }
         viewModel.playbackPositions.remove(path)
         viewModel.videoFileDetails.remove(path)
+        viewModel.removeFrameTimeline(path)
         try {
             path.delete()
         } catch (e: IOException) {

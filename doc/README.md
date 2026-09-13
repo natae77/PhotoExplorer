@@ -33,7 +33,9 @@ Windows 11에서 실제로 겪고 검증한 내용만 정리했다.
 | [10-image-viewer-swipe-down.md](10-image-viewer-swipe-down.md) | 미디어 뷰어에서 아래로 스와이프해 닫기 (사진·동영상 페이지 모두) |
 | [11-video-viewer-spec.md](11-video-viewer-spec.md) | 동영상 뷰어 기획서 — 앱 안에서 재생, 슬라이더·속도 조절·세부 정보 |
 | [11a-viewer-ui-cleanup-spec.md](11a-viewer-ui-cleanup-spec.md) | 뷰어 화면 정리 기획서 — 상·하단 검정 판 제거, 요소별 스크림, 슬라이더 판정 확대 |
+| [11b-video-precise-seek-spec.md](11b-video-precise-seek-spec.md) | 동영상 정밀 이동 기획서 — 실제 PTS 기준 이전·다음 프레임, 선택 가능한 1초 이동 |
 | [12-video-viewer-plan.md](12-video-viewer-plan.md) | 동영상 뷰어 구현 계획 (0~10단계) |
+| [12a-video-precise-seek-plan.md](12a-video-precise-seek-plan.md) | 동영상 정밀 이동 구현 계획 — PTS 로딩·프레임 커서·1초 모드·확장 터치 영역 |
 | [13-viewer-performance.md](13-viewer-performance.md) | 뷰어가 느려지는 원인 조사와 수정 — 원본 해상도 비트맵, 스와이프 끊김, 계측 함정 |
 | [14-file-list-ui-refresh-spec.md](14-file-list-ui-refresh-spec.md) | 파일 목록 화면 정리 기획서 — 폴더 구분선, 회색 경로 바, 노란 폴더, 즐겨찾기 바로가기 |
 | [15-file-list-ui-refresh-plan.md](15-file-list-ui-refresh-plan.md) | 파일 목록 화면 정리 구현 계획 — 변경 파일, 0~6단계, 테마·폴더블·접근성 검증 |

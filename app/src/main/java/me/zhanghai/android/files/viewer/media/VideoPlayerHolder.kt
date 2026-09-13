@@ -32,9 +32,9 @@ class VideoPlayerHolder(context: Context, listener: Player.Listener) {
             .setAudioAttributes(AudioAttributes.DEFAULT, true)
             // Pauses when headphones are unplugged.
             .setHandleAudioBecomingNoisy(true)
-            // Media3 defaults to 5s back and 15s forward. Spec 11 section 6.1 says 10s both ways.
-            .setSeekBackIncrementMs(10_000)
-            .setSeekForwardIncrementMs(10_000)
+            // Used when the viewer's selected move unit is one second.
+            .setSeekBackIncrementMs(1_000)
+            .setSeekForwardIncrementMs(1_000)
             .build()
             .apply {
                 repeatMode = Player.REPEAT_MODE_OFF

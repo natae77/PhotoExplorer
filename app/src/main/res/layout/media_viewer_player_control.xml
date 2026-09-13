@@ -31,14 +31,19 @@
         android:layout_marginBottom="13dp"
         android:orientation="horizontal">
 
-        <FrameLayout
-            android:layout_width="52dp"
-            android:layout_height="52dp"
-            android:layout_marginStart="8dp"
-            android:layout_marginEnd="8dp"
-            android:background="@drawable/media_viewer_scrim_circle"
-            android:foreground="@drawable/media_viewer_control_ripple"
-            android:addStatesFromChildren="true">
+        <me.zhanghai.android.files.viewer.media.PrimaryMediaControlButton
+            android:id="@+id/media_viewer_seek_back"
+            android:layout_width="68dp"
+            android:layout_height="64dp"
+            android:contentDescription="@string/media_viewer_previous_frame">
+
+            <FrameLayout
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:layout_gravity="center"
+                android:background="@drawable/media_viewer_scrim_circle"
+                android:duplicateParentState="true"
+                android:foreground="@drawable/media_viewer_control_ripple">
 
             <!-- singleLine override needed to avoid layout bugs, as in Media3's own include. -->
             <Button
@@ -50,39 +55,55 @@
                 android:layout_marginLeft="0dp"
                 android:layout_marginRight="0dp"
                 android:foreground="@null"
+                android:focusable="false"
+                android:importantForAccessibility="no"
                 android:paddingBottom="11dp"
                 android:textSize="6dp"
                 android:singleLine="false" />
-        </FrameLayout>
+            </FrameLayout>
+        </me.zhanghai.android.files.viewer.media.PrimaryMediaControlButton>
 
-        <FrameLayout
-            android:layout_width="52dp"
-            android:layout_height="52dp"
-            android:layout_marginStart="8dp"
-            android:layout_marginEnd="8dp"
-            android:background="@drawable/media_viewer_scrim_circle"
-            android:foreground="@drawable/media_viewer_control_ripple"
-            android:addStatesFromChildren="true">
+        <me.zhanghai.android.files.viewer.media.PrimaryMediaControlButton
+            android:id="@+id/media_viewer_play_pause"
+            android:layout_width="68dp"
+            android:layout_height="64dp"
+            android:contentDescription="@string/exo_controls_play_description">
+
+            <FrameLayout
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:layout_gravity="center"
+                android:background="@drawable/media_viewer_scrim_circle"
+                android:duplicateParentState="true"
+                android:foreground="@drawable/media_viewer_control_ripple">
 
             <ImageButton
                 android:id="@id/exo_play_pause"
                 style="@style/ExoStyledControls.Button.Center.PlayPause"
                 android:background="@null"
+                android:focusable="false"
+                android:importantForAccessibility="no"
                 android:layout_width="32dp"
                 android:layout_height="32dp"
                 android:layout_gravity="center"
                 android:layout_marginLeft="0dp"
                 android:layout_marginRight="0dp" />
-        </FrameLayout>
+            </FrameLayout>
+        </me.zhanghai.android.files.viewer.media.PrimaryMediaControlButton>
 
-        <FrameLayout
-            android:layout_width="52dp"
-            android:layout_height="52dp"
-            android:layout_marginStart="8dp"
-            android:layout_marginEnd="8dp"
-            android:background="@drawable/media_viewer_scrim_circle"
-            android:foreground="@drawable/media_viewer_control_ripple"
-            android:addStatesFromChildren="true">
+        <me.zhanghai.android.files.viewer.media.PrimaryMediaControlButton
+            android:id="@+id/media_viewer_seek_forward"
+            android:layout_width="68dp"
+            android:layout_height="64dp"
+            android:contentDescription="@string/media_viewer_next_frame">
+
+            <FrameLayout
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:layout_gravity="center"
+                android:background="@drawable/media_viewer_scrim_circle"
+                android:duplicateParentState="true"
+                android:foreground="@drawable/media_viewer_control_ripple">
 
             <Button
                 android:id="@id/exo_ffwd_with_amount"
@@ -93,10 +114,13 @@
                 android:layout_marginLeft="0dp"
                 android:layout_marginRight="0dp"
                 android:foreground="@null"
+                android:focusable="false"
+                android:importantForAccessibility="no"
                 android:paddingBottom="11dp"
                 android:textSize="6dp"
                 android:singleLine="false" />
-        </FrameLayout>
+            </FrameLayout>
+        </me.zhanghai.android.files.viewer.media.PrimaryMediaControlButton>
     </LinearLayout>
 
     <LinearLayout

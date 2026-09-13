@@ -706,6 +706,14 @@
     <string name="image_viewer_delete_message_format" translatable="false">@string/file_delete_message_file_format</string>
     <string name="media_viewer_open_with">Open with another app</string>
     <string name="media_viewer_playback_speed">Playback speed</string>
+    <string name="media_viewer_seek_unit">Move unit</string>
+    <string name="media_viewer_seek_unit_frame">Frame</string>
+    <string name="media_viewer_seek_unit_second">Second</string>
+    <string name="media_viewer_previous_frame">Previous frame</string>
+    <string name="media_viewer_next_frame">Next frame</string>
+    <string name="media_viewer_back_one_second">Back 1 second</string>
+    <string name="media_viewer_forward_one_second">Forward 1 second</string>
+    <string name="media_viewer_frame_timeline_unavailable">Frame information is unavailable. Choose “Second” from Move unit.</string>
     <string name="media_viewer_speed_0_25">0.25\u00d7</string>
     <string name="media_viewer_speed_0_5">0.5\u00d7</string>
     <string name="media_viewer_speed_0_75">0.75\u00d7</string>

@@ -27,6 +27,23 @@
     </item>
 
     <item
+        android:id="@+id/action_video_seek_unit"
+        android:orderInCategory="55"
+        android:title="@string/media_viewer_seek_unit"
+        app:showAsAction="never">
+        <menu>
+            <group android:checkableBehavior="single">
+                <item
+                    android:id="@+id/action_seek_by_frame"
+                    android:title="@string/media_viewer_seek_unit_frame" />
+                <item
+                    android:id="@+id/action_seek_by_second"
+                    android:title="@string/media_viewer_seek_unit_second" />
+            </group>
+        </menu>
+    </item>
+
+    <item
         android:id="@+id/action_video_details"
         android:orderInCategory="60"
         android:title="@string/media_viewer_details"
