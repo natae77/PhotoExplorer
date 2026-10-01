@@ -776,9 +776,10 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
                 binding.errorText.text = error
             }
         }
-        if (files != null) {
+        if (files != null && viewModel.isFileListReadyForRequestedPresentation) {
+            applyRequestedPresentation()
             updateAdapterFileList()
-        } else {
+        } else if (files == null) {
             // This resets animation as well.
             adapter.clear()
             activeMediaViewportSessionId?.let {
@@ -864,12 +865,15 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
     }
 
     private fun onViewTypeChanged(viewType: FileViewType) {
+        viewModel.setDirectoryItemCountLoadingEnabled(isViewStarted)
+        updateViewSortMenuItems()
+        if (!viewModel.isFileListReadyForRequestedPresentation) {
+            return
+        }
         updateSpanCount()
         adapter.viewType = viewType
-        viewModel.setDirectoryItemCountLoadingEnabled(isViewStarted)
         // The set of displayed files depends on the view type in media mode.
         updateAdapterFileList()
-        updateViewSortMenuItems()
         // Switching into media mode should land on the newest item too, not just opening a folder
         // that is already in media mode.
         hasScrolledToLatest = false
@@ -898,11 +902,14 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
         }
 
     private fun onSortOptionsChanged(sortOptions: FileSortOptions) {
+        updateViewSortMenuItems()
+        if (!viewModel.isFileListReadyForRequestedPresentation) {
+            return
+        }
         adapter.sortOptions = sortOptions
         // The view type observer may have run before this one, in which case its rebuild was a
         // no-op and the list still has to be built.
         updateAdapterFileList()
-        updateViewSortMenuItems()
     }
 
     private fun updateViewSortMenuItems() {
@@ -972,6 +979,9 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
     }
 
     private fun updateAdapterFileList() {
+        if (!viewModel.isFileListReadyForRequestedPresentation) {
+            return
+        }
         // May be called before the first load has produced anything, e.g. from the view type
         // observer during startup.
         var files = viewModel.fileListLiveData.value?.value ?: return
@@ -991,6 +1001,14 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
         }
         viewModel.setDirectoryItemCountCandidates(files)
         updateEmptyView()
+    }
+
+    private fun applyRequestedPresentation() {
+        val viewType = viewModel.viewTypeLiveData.value ?: return
+        val sortOptions = viewModel.sortOptionsLiveData.value ?: return
+        updateSpanCount()
+        adapter.viewType = viewType
+        adapter.sortOptions = sortOptions
     }
 
     /**

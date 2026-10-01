@@ -9,6 +9,7 @@ import androidx.annotation.WorkerThread
 import java8.nio.channels.SeekableByteChannel
 import java8.nio.file.Path
 import me.zhanghai.android.files.provider.common.newByteChannel
+import java.io.InterruptedIOException
 import java.nio.ByteBuffer
 import java.time.Instant
 
@@ -22,6 +23,8 @@ import java.time.Instant
  * the `mdat` box would turn a ~300 byte read into a multi-hundred-kilobyte one.
  */
 object Mp4CreationTime {
+    internal data class ReadResult(val value: Long?, val failed: Boolean)
+
     // Difference between the 1904-01-01 epoch used by ISO base media files and the Unix epoch.
     private const val EPOCH_OFFSET_SECONDS = 2_082_844_800L
 
@@ -42,12 +45,26 @@ object Mp4CreationTime {
      * determined. Never throws.
      */
     @WorkerThread
-    fun read(path: Path): Long? =
+    fun read(path: Path): Long? = readResult(path).value
+
+    @WorkerThread
+    internal fun readResult(path: Path): ReadResult =
         try {
-            path.newByteChannel().use { channel -> readMoovCreationTime(channel, channel.size()) }
+            ReadResult(
+                path.newByteChannel().use { channel ->
+                    readMoovCreationTime(channel, channel.size())
+                },
+                false
+            )
         } catch (e: Exception) {
-            // A media file we cannot parse is not an error, it just has no creation time.
-            null
+            if (e is InterruptedException || e is InterruptedIOException
+                || Thread.currentThread().isInterrupted) {
+                Thread.currentThread().interrupt()
+                throw InterruptedIOException("MP4 metadata read interrupted").apply {
+                    initCause(e)
+                }
+            }
+            ReadResult(null, true)
         }
 
     private fun readMoovCreationTime(channel: SeekableByteChannel, fileSize: Long): Long? {
@@ -55,6 +72,9 @@ object Mp4CreationTime {
         var offset = 0L
         var boxCount = 0
         while (true) {
+            if (Thread.currentThread().isInterrupted) {
+                throw InterruptedIOException("MP4 metadata read interrupted")
+            }
             if (++boxCount > MAX_BOX_COUNT) {
                 return null
             }

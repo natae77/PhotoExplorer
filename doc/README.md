@@ -40,6 +40,8 @@ Windows 11에서 실제로 겪고 검증한 내용만 정리했다.
 | [16-file-list-ui-refinement-spec.md](16-file-list-ui-refinement-spec.md) | 파일 목록 후속 개선 기획서 — 경로 간격, 폴더·선택 아이콘, LIST 보조 정보, 현재 폴더 제목 |
 | [17-file-list-ui-refinement-plan.md](17-file-list-ui-refinement-plan.md) | 파일 목록 후속 개선 구현 계획 — 상단 surface, 아이콘, 폴더 개수 비동기 cache, 단계별 검증 |
 | [18-shared-element-transition-plan.md](18-shared-element-transition-plan.md) | 그리드 ↔ 뷰어 공유 요소 전환 기획·계획 (0~12단계) — 타일이 커지며 열리고 타일로 줄어들며 닫힌다 |
+| [19-media-created-time-cache-plan.md](19-media-created-time-cache-plan.md) | 대용량 폴더 성능 개선 계획 — 모드별 판독, 폴더당 영구 캐시 파일, 안정된 정렬 |
+| [20-large-folder-cache-emulator-test-plan.md](20-large-folder-cache-emulator-test-plan.md) | 5,000개 폴더 캐시 에뮬레이터 테스트 계획과 실행 결과 |
 | [media-view-mode-open-items.md](media-view-mode-open-items.md) | 09번 계획서의 미결 항목 — 누락·미결정·문서 모순 (착수 전 확인) |
 
 ## 핵심 요약 (급할 때 여기만)

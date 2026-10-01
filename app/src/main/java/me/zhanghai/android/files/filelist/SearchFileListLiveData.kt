@@ -19,12 +19,14 @@ import me.zhanghai.android.files.util.valueCompat
 import java.io.IOException
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Future
+import java.util.concurrent.atomic.AtomicLong
 
 class SearchFileListLiveData(
     private val path: Path,
     private val query: String
 ) : CloseableLiveData<Stateful<List<FileItem>>>() {
     private var future: Future<Unit>? = null
+    private val generation = AtomicLong()
 
     init {
         loadValue()
@@ -32,6 +34,7 @@ class SearchFileListLiveData(
 
     fun loadValue() {
         future?.cancel(true)
+        val generation = generation.incrementAndGet()
         value = Loading(emptyList())
         future = (AsyncTask.THREAD_POOL_EXECUTOR as ExecutorService).submit<Unit> {
             val fileList = mutableListOf<FileItem>()
@@ -47,17 +50,28 @@ class SearchFileListLiveData(
                         }
                         fileList.add(fileItem)
                     }
-                    postValue(Loading(fileList.toList()))
+                    if (isCurrent(generation)) {
+                        postValue(Loading(fileList.toList()))
+                    }
                 }
-                postValue(Success(fileList))
+                if (isCurrent(generation)) {
+                    postValue(Success(fileList))
+                }
             } catch (e: Exception) {
+                if (!isCurrent(generation)) {
+                    return@submit
+                }
                 // TODO: Retrieval of previous value is racy.
                 postValue(Failure(valueCompat.value, e))
             }
         }
     }
 
+    private fun isCurrent(generation: Long): Boolean =
+        this.generation.get() == generation && !Thread.currentThread().isInterrupted
+
     override fun close() {
+        generation.incrementAndGet()
         future?.cancel(true)
     }
 

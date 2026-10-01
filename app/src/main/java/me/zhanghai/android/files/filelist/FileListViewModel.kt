@@ -109,21 +109,6 @@ class FileListViewModel : ViewModel() {
         _searchStateLiveData.value = SearchState(false, "")
     }
 
-    private val _fileListLiveData =
-        FileListSwitchMapLiveData(currentPathLiveData, _searchStateLiveData)
-    val fileListLiveData: LiveData<Stateful<List<FileItem>>>
-        get() = _fileListLiveData
-    val fileListStateful: Stateful<List<FileItem>>
-        get() = _fileListLiveData.valueCompat
-
-    fun reload() {
-        val path = currentPath
-        if (path.isArchivePath) {
-            path.archiveRefresh()
-        }
-        _fileListLiveData.reload()
-    }
-
     val searchViewExpandedLiveData = MutableLiveData(false)
     var isSearchViewExpanded: Boolean
         get() = searchViewExpandedLiveData.valueCompat
@@ -167,6 +152,24 @@ class FileListViewModel : ViewModel() {
 
     fun setSortDirectoriesFirst(isDirectoriesFirst: Boolean) =
         _sortOptionsLiveData.putIsDirectoriesFirst(isDirectoriesFirst)
+
+    private val _fileListLiveData = FileListSwitchMapLiveData(
+        currentPathLiveData, _searchStateLiveData, _viewTypeLiveData, _sortOptionsLiveData
+    )
+    val fileListLiveData: LiveData<Stateful<List<FileItem>>>
+        get() = _fileListLiveData
+    val fileListStateful: Stateful<List<FileItem>>
+        get() = _fileListLiveData.valueCompat
+    val isFileListReadyForRequestedPresentation: Boolean
+        get() = _fileListLiveData.isReadyForRequestedPresentation
+
+    fun reload() {
+        val path = currentPath
+        if (path.isArchivePath) {
+            path.archiveRefresh()
+        }
+        _fileListLiveData.reload()
+    }
 
     private val _pickOptionsLiveData = MutableLiveData<PickOptions?>()
     val pickOptionsLiveData: LiveData<PickOptions?>
@@ -282,29 +285,53 @@ class FileListViewModel : ViewModel() {
 
     private class FileListSwitchMapLiveData(
         private val pathLiveData: LiveData<Path>,
-        private val searchStateLiveData: LiveData<SearchState>
+        private val searchStateLiveData: LiveData<SearchState>,
+        private val viewTypeLiveData: LiveData<FileViewType>,
+        private val sortOptionsLiveData: LiveData<FileSortOptions>
     ) : MediatorLiveData<Stateful<List<FileItem>>>(), Closeable {
         private var liveData: CloseableLiveData<Stateful<List<FileItem>>>? = null
+        private var sourceKey: SourceKey? = null
+        private var requiresMediaCreatedTime = false
+        private var currentSourceComplete = false
+
+        val isReadyForRequestedPresentation: Boolean
+            get() = !requiresMediaCreatedTime || currentSourceComplete
 
         init {
             addSource(pathLiveData) { updateSource() }
             addSource(searchStateLiveData) { updateSource() }
+            addSource(viewTypeLiveData) { updateSource() }
+            addSource(sortOptionsLiveData) { updateSource() }
         }
 
         private fun updateSource() {
+            val path = pathLiveData.value ?: return
+            val searchState = searchStateLiveData.value ?: return
+            val viewType = viewTypeLiveData.value ?: return
+            val sortOptions = sortOptionsLiveData.value ?: return
+            val includeMediaCreatedTime = !searchState.isSearching &&
+                (viewType == FileViewType.MEDIA || sortOptions.by == By.MEDIA_CREATED)
+            val sourceKey = SourceKey(path, searchState, includeMediaCreatedTime)
+            if (this.sourceKey == sourceKey) {
+                return
+            }
+            this.sourceKey = sourceKey
+            requiresMediaCreatedTime = includeMediaCreatedTime
+            currentSourceComplete = false
             liveData?.let {
                 removeSource(it)
                 it.close()
             }
-            val path = pathLiveData.valueCompat
-            val searchState = searchStateLiveData.valueCompat
             val liveData = if (searchState.isSearching) {
                 SearchFileListLiveData(path, searchState.query)
             } else {
-                FileListLiveData(path)
+                FileListLiveData(path, includeMediaCreatedTime)
             }
             this.liveData = liveData
-            addSource(liveData) { value = it }
+            addSource(liveData) {
+                currentSourceComplete = it is me.zhanghai.android.files.util.Success
+                value = it
+            }
         }
 
         fun reload() {
@@ -321,6 +348,12 @@ class FileListViewModel : ViewModel() {
                 this.liveData = null
             }
         }
+
+        private data class SourceKey(
+            val path: Path,
+            val searchState: SearchState,
+            val includeMediaCreatedTime: Boolean
+        )
     }
 }
 

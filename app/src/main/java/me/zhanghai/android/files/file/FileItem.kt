@@ -58,11 +58,7 @@ fun Path.loadFileItem(): FileItem {
     val isHidden = isHidden
     if (!attributes.isSymbolicLink) {
         val mimeType = AndroidFileTypeDetector.getMimeType(this, attributes).asMimeType()
-        val mediaCreatedTimeMillis = MediaCreatedTime.read(this, attributes, mimeType)
-        return FileItem(
-            this, nameCollationKey, attributes, null, null, isHidden, mimeType,
-            mediaCreatedTimeMillis
-        )
+        return FileItem(this, nameCollationKey, attributes, null, null, isHidden, mimeType)
     }
     val symbolicLinkTarget = readSymbolicLinkByteString().toString()
     val symbolicLinkTargetAttributes = try {
@@ -74,10 +70,8 @@ fun Path.loadFileItem(): FileItem {
     val mimeType = AndroidFileTypeDetector.getMimeType(
         this, symbolicLinkTargetAttributes ?: attributes
     ).asMimeType()
-    val targetAttributes = symbolicLinkTargetAttributes ?: attributes
-    val mediaCreatedTimeMillis = MediaCreatedTime.read(this, targetAttributes, mimeType)
     return FileItem(
         this, nameCollationKey, attributes, symbolicLinkTarget, symbolicLinkTargetAttributes,
-        isHidden, mimeType, mediaCreatedTimeMillis
+        isHidden, mimeType
     )
 }

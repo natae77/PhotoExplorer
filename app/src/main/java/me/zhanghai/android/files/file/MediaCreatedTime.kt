@@ -23,6 +23,7 @@ import me.zhanghai.android.files.util.isMediaMetadataRetrieverCompatible
 import me.zhanghai.android.files.util.setDataSource
 import me.zhanghai.android.files.util.valueCompat
 import me.zhanghai.android.files.BuildConfig
+import java.io.InterruptedIOException
 import java.time.Instant
 import java.time.format.DateTimeFormatter
 
@@ -34,6 +35,13 @@ import java.time.format.DateTimeFormatter
  * overwritten while moving the file around.
  */
 object MediaCreatedTime {
+    internal data class ReadResult(val value: Long?, val canPersist: Boolean)
+
+    private sealed class MetadataReadResult {
+        data class Success(val value: Long?) : MetadataReadResult()
+        data object Failure : MetadataReadResult()
+    }
+
     private const val LOG_TAG = "MediaCreatedTime"
 
     // LruCache cannot store null values, and "we looked and there is nothing" is exactly the answer
@@ -52,16 +60,39 @@ object MediaCreatedTime {
      * Callers fall back to the last modified time when this returns null.
      */
     @WorkerThread
-    fun read(path: Path, attributes: BasicFileAttributes, mimeType: MimeType): Long? {
+    fun read(path: Path, attributes: BasicFileAttributes, mimeType: MimeType): Long? =
+        readForCache(path, attributes, mimeType).value
+
+    @WorkerThread
+    internal fun readForCache(
+        path: Path,
+        attributes: BasicFileAttributes,
+        mimeType: MimeType
+    ): ReadResult {
         if (!isSupported(path, attributes, mimeType)) {
-            return null
+            return ReadResult(null, false)
         }
         val lastModifiedMillis = attributes.lastModifiedTime().toMillis()
-        val key = CacheKey(path.toString(), attributes.size(), lastModifiedMillis)
-        cache[key]?.let { return if (it == NO_VALUE) null else it }
-        val metadataMillis = readMetadataMillis(path, mimeType, lastModifiedMillis)
+        val pathIdentity = try {
+            path.toAbsolutePath().normalize().toUri().toString()
+        } catch (exception: Exception) {
+            path.fileSystem.provider().scheme + ":" + path.toAbsolutePath().normalize()
+        }
+        val key = CacheKey(pathIdentity, attributes.size(), lastModifiedMillis)
+        cache[key]?.let {
+            return ReadResult(if (it == NO_VALUE) null else it, true)
+        }
+        val metadataResult = readMetadataMillis(path, mimeType, lastModifiedMillis)
+        if (metadataResult is MetadataReadResult.Failure) {
+            return ReadResult(null, false)
+        }
+        val metadataMillis = (metadataResult as MetadataReadResult.Success).value
         // min(metadata, mtime), see spec 5.4.
-        val value = metadataMillis?.coerceAtMost(lastModifiedMillis)
+        val value = if (lastModifiedMillis > 0L) {
+            metadataMillis?.coerceAtMost(lastModifiedMillis)
+        } else {
+            metadataMillis
+        }
         cache.put(key, value ?: NO_VALUE)
         if (BuildConfig.DEBUG) {
             Log.d(
@@ -70,7 +101,7 @@ object MediaCreatedTime {
                     " mtime=${format(lastModifiedMillis)} -> ${format(value)}"
             )
         }
-        return value
+        return ReadResult(value, true)
     }
 
     /** Mirrors the exclusions of `FileItem.supportsThumbnail`, see plan 1.2. */
@@ -97,38 +128,64 @@ object MediaCreatedTime {
         return true
     }
 
-    private fun readMetadataMillis(path: Path, mimeType: MimeType, lastModifiedMillis: Long): Long? {
+    private fun readMetadataMillis(
+        path: Path,
+        mimeType: MimeType,
+        lastModifiedMillis: Long
+    ): MetadataReadResult {
         return when {
             mimeType.isImage -> readExifMillis(path, lastModifiedMillis)
-            mimeType.isVideo ->
-                Mp4CreationTime.read(path) ?: readMediaMetadataRetrieverMillis(path)
-            else -> null
+            mimeType.isVideo -> {
+                val mp4Result = Mp4CreationTime.readResult(path)
+                if (mp4Result.value != null) {
+                    MetadataReadResult.Success(mp4Result.value)
+                } else {
+                    when (val fallbackResult = readMediaMetadataRetrieverMillis(path)) {
+                        is MetadataReadResult.Success -> fallbackResult
+                        MetadataReadResult.Failure -> if (mp4Result.failed) {
+                            MetadataReadResult.Failure
+                        } else {
+                            fallbackResult
+                        }
+                    }
+                }
+            }
+            else -> MetadataReadResult.Success(null)
         }
     }
 
-    private fun readExifMillis(path: Path, lastModifiedMillis: Long): Long? =
+    private fun readExifMillis(
+        path: Path,
+        lastModifiedMillis: Long
+    ): MetadataReadResult =
         try {
-            path.newInputStream().use {
-                ExifInterface(it)
-                    .inferDateTimeOriginal(Instant.ofEpochMilli(lastModifiedMillis))
-                    ?.toEpochMilli()
-            }
+            MetadataReadResult.Success(
+                path.newInputStream().use {
+                    ExifInterface(it)
+                        .inferDateTimeOriginal(Instant.ofEpochMilli(lastModifiedMillis))
+                        ?.toEpochMilli()
+                }
+            )
         } catch (e: Exception) {
-            null
+            throwIfInterrupted(e)
+            MetadataReadResult.Failure
         }
 
     /** Fallback for containers the lightweight box parser cannot handle (mkv, webm, ...). */
-    private fun readMediaMetadataRetrieverMillis(path: Path): Long? {
+    private fun readMediaMetadataRetrieverMillis(path: Path): MetadataReadResult {
         if (!path.isMediaMetadataRetrieverCompatible) {
-            return null
+            return MetadataReadResult.Success(null)
         }
         return try {
-            MediaMetadataRetriever().use { retriever ->
-                retriever.setDataSource(path)
-                retriever.date?.toEpochMilli()
-            }
+            MetadataReadResult.Success(
+                MediaMetadataRetriever().use { retriever ->
+                    retriever.setDataSource(path)
+                    retriever.date?.toEpochMilli()
+                }
+            )
         } catch (e: Exception) {
-            null
+            throwIfInterrupted(e)
+            MetadataReadResult.Failure
         }
     }
 
@@ -142,6 +199,16 @@ object MediaCreatedTime {
                 e.printStackTrace()
             }
         }
+
+    private fun throwIfInterrupted(exception: Exception) {
+        if (exception is InterruptedException || exception is InterruptedIOException
+            || Thread.currentThread().isInterrupted) {
+            Thread.currentThread().interrupt()
+            throw InterruptedIOException("Media metadata read interrupted").apply {
+                initCause(exception)
+            }
+        }
+    }
 
     private fun format(millis: Long?): String =
         if (millis == null) {
