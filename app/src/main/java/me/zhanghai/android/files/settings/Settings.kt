@@ -26,6 +26,12 @@ import me.zhanghai.android.files.theme.night.NightMode
 import java.io.File
 
 object Settings {
+    val MEDIA_VIEWER_PLAYBACK_SPEED: SettingLiveData<String> =
+        StringSettingLiveData(
+            R.string.pref_key_media_viewer_playback_speed,
+            R.string.pref_default_value_media_viewer_playback_speed
+        )
+
     val STORAGES: SettingLiveData<List<Storage>> =
         ParcelValueSettingLiveData(
             R.string.pref_key_storages,

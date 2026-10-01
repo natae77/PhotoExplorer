@@ -1,3 +1,5 @@
+/.vscode/
+
 /.gradle/
 /.idea/
 /.kotlin/
@@ -5,8 +7,9 @@
 /captures/
 /gradle/gradle-daemon-jvm.properties
 /local.properties
-/PersonalDev/
 /signing.jks
 /signing.properties
-.DS_Store
+
 *.iml
+
+.tmp*.png

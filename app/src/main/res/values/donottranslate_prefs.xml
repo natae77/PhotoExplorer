@@ -9,6 +9,10 @@
 
     <string name="pref_default_value_empty" />
 
+    <!-- Internal media viewer state; this is intentionally not shown in the Settings screen. -->
+    <string name="pref_key_media_viewer_playback_speed">key_media_viewer_playback_speed</string>
+    <string name="pref_default_value_media_viewer_playback_speed">1.0</string>
+
     <string name="pref_key_storages">key_storages</string>
     <string name="pref_key_file_list_default_directory">key_file_list_default_directory</string>
     <string name="pref_key_file_list_persistent_drawer_open">key_file_list_persistent_drawer_open</string>
