@@ -13,6 +13,7 @@ class VideoPlaybackSpeedTest {
     fun supportedValueIsRestored() {
         assertEquals(0.04f, parsePersistedVideoPlaybackSpeed("0.04"))
         assertEquals(0.1f, parsePersistedVideoPlaybackSpeed("0.1"))
+        assertEquals(0.25f, parsePersistedVideoPlaybackSpeed("0.25"))
         assertEquals(2f, parsePersistedVideoPlaybackSpeed("2.0"))
     }
 
@@ -22,5 +23,13 @@ class VideoPlaybackSpeedTest {
         assertEquals(DEFAULT_VIDEO_PLAYBACK_SPEED, parsePersistedVideoPlaybackSpeed("invalid"))
         assertEquals(DEFAULT_VIDEO_PLAYBACK_SPEED, parsePersistedVideoPlaybackSpeed("0.75"))
         assertEquals(DEFAULT_VIDEO_PLAYBACK_SPEED, parsePersistedVideoPlaybackSpeed("1.5"))
+    }
+
+    @Test
+    fun audioIsEnabledOnlyAtNormalSpeed() {
+        for (speed in SUPPORTED_VIDEO_PLAYBACK_SPEEDS) {
+            assertEquals(speed != DEFAULT_VIDEO_PLAYBACK_SPEED,
+                shouldDisableAudioForPlaybackSpeed(speed))
+        }
     }
 }

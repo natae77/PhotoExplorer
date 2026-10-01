@@ -1264,7 +1264,7 @@ class MediaViewerFragment :
     }
 
     private fun applyPlaybackSpeed(player: Player, speed: Float) {
-        val disableAudio = speed < MIN_AUDIO_PLAYBACK_SPEED
+        val disableAudio = shouldDisableAudioForPlaybackSpeed(speed)
         val parameters = player.trackSelectionParameters
         if ((C.TRACK_TYPE_AUDIO in parameters.disabledTrackTypes) != disableAudio) {
             player.trackSelectionParameters = parameters.buildUpon()
