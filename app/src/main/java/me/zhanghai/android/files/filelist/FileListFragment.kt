@@ -763,7 +763,12 @@ class FileListFragment : Fragment(), BreadcrumbLayout.Listener, BookmarkBarLayou
             else -> binding.toolbar.subtitle = getSubtitle(files!!)
         }
         val hasFiles = !files.isNullOrEmpty()
-        binding.swipeRefreshLayout.isRefreshing = stateful is Loading && (hasFiles || isSearching)
+        // SwipeRefreshLayout already turns its indicator on for an actual swipe gesture. Do not
+        // turn it on for PathObserver reloads: file operations can emit several notifications and
+        // would otherwise leave a large white spinner over an otherwise usable media grid.
+        if (stateful !is Loading) {
+            binding.swipeRefreshLayout.isRefreshing = false
+        }
         binding.progress.fadeToVisibilityUnsafe(stateful is Loading && !(hasFiles || isSearching))
         binding.errorText.fadeToVisibilityUnsafe(stateful is Failure && !hasFiles)
         val throwable = (stateful as? Failure)?.throwable

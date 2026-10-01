@@ -70,6 +70,9 @@ class FileListAdapter(
     var viewType: FileViewType
         get() = _viewType
         set(value) {
+            if (this::_viewType.isInitialized && _viewType == value) {
+                return
+            }
             _viewType = value
             if (!isSearching) {
                 rebuildItems(true)
@@ -80,6 +83,9 @@ class FileListAdapter(
     var sortOptions: FileSortOptions
         get() = _sortOptions
         set(value) {
+            if (this::_sortOptions.isInitialized && _sortOptions == value) {
+                return
+            }
             _sortOptions = value
             if (!isSearching) {
                 rebuildItems(true)
